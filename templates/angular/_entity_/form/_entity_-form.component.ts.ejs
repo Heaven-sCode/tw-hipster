@@ -1,0 +1,189 @@
+// This is an EJS template that generates the reusable form component for an entity.
+import { CommonModule } from '@angular/common';
+import { Component, EventEmitter, Input, Optional, Output, OnChanges, OnInit, SimpleChanges, inject } from '@angular/core';
+import { ReactiveFormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
+import { finalize } from 'rxjs/operators';
+
+import { I<%= entity.name %>, New<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
+import { <%= entity.name %>Service } from '../service/<%= toKebabCase(entity.name) %>.service';
+import { <%= entity.name %>FormGroup, <%= entity.name %>FormService } from '../update/<%= toKebabCase(entity.name) %>-form.service';
+
+<%
+// Helper computation for relationship-related imports and names
+function relationshipPropertyName(rel) {
+  const isCollection = ['OneToMany', 'ManyToMany'].includes(rel.type);
+  if (rel.from.fieldName) {
+    return toCamelCase(rel.from.fieldName);
+  }
+  return isCollection ? toCamelCase(rel.otherEntityNamePlural) : toCamelCase(rel.otherEntityName);
+}
+const relationshipsForControls = relationships.filter(rel => rel.type !== 'OneToMany');
+const relationshipImports = new Map();
+relationshipsForControls.forEach(rel => {
+  if (!relationshipImports.has(rel.otherEntityName)) {
+    relationshipImports.set(
+      rel.otherEntityName,
+      {
+        modelImport: `import { I${rel.otherEntityName} } from '../../${toKebabCase(rel.otherEntityName)}/${toKebabCase(rel.otherEntityName)}.model';`,
+        serviceImport: `import { ${rel.otherEntityName}Service } from '../../${toKebabCase(rel.otherEntityName)}/service/${toKebabCase(rel.otherEntityName)}.service';`,
+      }
+    );
+  }
+});
+
+const enumImports = new Map();
+entity.fields.forEach(field => {
+  if (field.fieldTypeIsEnum && !enumImports.has(field.fieldType)) {
+    enumImports.set(field.fieldType, `import { ${field.fieldType} } from '../../../enums/${toKebabCase(field.fieldType)}.model';`);
+  }
+});
+%>
+<%- Array.from(relationshipImports.values()).map(item => item.modelImport).join('\n') %>
+<%- Array.from(relationshipImports.values()).map(item => item.serviceImport).join('\n') %>
+<%- Array.from(enumImports.values()).join('\n') %>
+
+type <%= entity.name %>FormDialogData = {
+  entity?: I<%= entity.name %>;
+  defaults?: Partial<New<%= entity.name %>>;
+  heading?: string;
+};
+
+@Component({
+  selector: 'app-<%= toKebabCase(entity.name) %>-form',
+  standalone: true,
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatCheckboxModule,
+    MatDatepickerModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+    MatNativeDateModule,
+    MatProgressSpinnerModule,
+    MatSelectModule,
+  ],
+  templateUrl: './<%= toKebabCase(entity.name) %>-form.component.html',
+})
+export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
+  private readonly <%= toCamelCase(entity.name) %>Service = inject(<%= entity.name %>Service);
+  private readonly formService = inject(<%= entity.name %>FormService);
+  private readonly dialogRef = inject(MatDialogRef<<%= entity.name %>FormComponent>, { optional: true });
+  private readonly dialogData = inject(MAT_DIALOG_DATA, { optional: true }) as <%= entity.name %>FormDialogData | null;
+
+  @Input() entity: I<%= entity.name %> | null = null;
+  @Input() heading?: string;
+
+  @Output() saved = new EventEmitter<I<%= entity.name %>>();
+  @Output() cancelled = new EventEmitter<void>();
+
+  form: <%= entity.name %>FormGroup = this.formService.create<%= entity.name %>FormGroup();
+  isSaving = false;
+  isInitialized = false;
+  errorMessage: string | null = null;
+
+  <% entity.fields.forEach(field => { if (field.fieldTypeIsEnum) { %>
+  readonly <%= toCamelCase(field.fieldType) %>Options = Object.keys(<%= field.fieldType %>);
+  <% }}); %>
+
+  <% relationshipsForControls.forEach(rel => { 
+       const propertyName = relationshipPropertyName(rel);
+       const otherEntityCamel = toCamelCase(rel.otherEntityName);
+       const otherEntityPascal = rel.otherEntityName;
+       const optionsProperty = `${otherEntityCamel}Options`;
+  %>
+  private readonly <%= otherEntityCamel %>Service = inject(<%= otherEntityPascal %>Service);
+  <%= optionsProperty %>: I<%= otherEntityPascal %>[] = [];
+  <% }); %>
+
+  ngOnInit(): void {
+    this.initializeFormFromInputs();
+    this.loadRelationshipOptions();
+    this.isInitialized = true;
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!this.isInitialized) {
+      return;
+    }
+    if (changes['entity'] && changes['entity'].currentValue) {
+      this.formService.resetForm(this.form, { ...(changes['entity'].currentValue as I<%= entity.name %>) });
+    }
+  }
+
+  onSubmit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    this.errorMessage = null;
+    this.isSaving = true;
+    const payload = this.formService.get<%= entity.name %>(this.form);
+    const isUpdate = payload.id !== null;
+    const request$ = isUpdate
+      ? this.<%= toCamelCase(entity.name) %>Service.update(payload as I<%= entity.name %>)
+      : this.<%= toCamelCase(entity.name) %>Service.create(payload as New<%= entity.name %>);
+
+    request$.pipe(finalize(() => (this.isSaving = false))).subscribe({
+      next: response => {
+        if (response.body) {
+          this.saved.emit(response.body);
+          this.dialogRef?.close(response.body);
+        }
+      },
+      error: () => {
+        this.errorMessage = 'Unable to save record. Please try again.';
+      },
+    });
+  }
+
+  onCancel(): void {
+    this.cancelled.emit();
+    this.dialogRef?.close();
+  }
+
+  get isEditMode(): boolean {
+    return !!this.form.controls.id.value;
+  }
+
+  readonly compareEntityById = (option: { id?: number } | null, value: { id?: number } | null): boolean =>
+    option && value ? option.id === value.id : option === value;
+
+  private initializeFormFromInputs(): void {
+    if (!this.heading && this.dialogData?.heading) {
+      this.heading = this.dialogData.heading;
+    }
+    const entity = this.entity ?? this.dialogData?.entity ?? null;
+    const defaults = this.dialogData?.defaults ?? {};
+    if (entity) {
+      this.formService.resetForm(this.form, entity);
+    } else {
+      this.formService.resetForm(this.form, { id: null, ...defaults } as Partial<New<%= entity.name %>>);
+    }
+  }
+
+  private loadRelationshipOptions(): void {
+    <% relationshipsForControls.forEach(rel => { 
+      const otherEntityCamel = toCamelCase(rel.otherEntityName);
+      const optionsProperty = `${otherEntityCamel}Options`;
+    %>
+    this.<%= otherEntityCamel %>Service.query().subscribe({
+      next: response => (this.<%= optionsProperty %> = response.body ?? []),
+      error: () => (this.<%= optionsProperty %> = []),
+    });
+    <% }); %>
+  }
+}

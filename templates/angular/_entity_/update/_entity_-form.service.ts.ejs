@@ -2,12 +2,26 @@ import { Injectable } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { I<%= entity.name %>, New<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
 
+<%
+function relationshipPropertyName(rel) {
+  const isCollection = ['OneToMany', 'ManyToMany'].includes(rel.type);
+  if (rel.from.fieldName) {
+    return toCamelCase(rel.from.fieldName);
+  }
+  return isCollection ? toCamelCase(rel.otherEntityNamePlural) : toCamelCase(rel.otherEntityName);
+}
+const relationshipsForControls = relationships.filter(rel => rel.type !== 'OneToMany');
+%>
+
 type <%= entity.name %>FormGroupInput = I<%= entity.name %> | Partial<New<%= entity.name %>>;
 type <%= entity.name %>FormRawValue = I<%= entity.name %>;
 export type <%= entity.name %>FormGroup = FormGroup<{
   id: FormControl<I<%= entity.name %>['id'] | New<%= entity.name %>['id']>;
   <% entity.fields.forEach(field => { %>
   <%= field.fieldName %>: FormControl<I<%= entity.name %>['<%= field.fieldName %>']>;
+  <% }); %>
+  <% relationshipsForControls.forEach(rel => { const propertyName = relationshipPropertyName(rel); const isCollection = ['ManyToMany'].includes(rel.type); %>
+  <%= propertyName %>: FormControl<<%= isCollection ? `I${rel.otherEntityName}[]` : `I${rel.otherEntityName}` %> | null>;
   <% }); %>
 }>;
 
@@ -22,6 +36,9 @@ export class <%= entity.name %>FormService {
       <% entity.fields.forEach(field => { %>
       <%= field.fieldName %>: new FormControl(entity.<%= field.fieldName %><% if (field.fieldValidateRules.includes('required')) { %>, Validators.required<% } %>),
       <% }); %>
+      <% relationshipsForControls.forEach(rel => { const propertyName = relationshipPropertyName(rel); const isCollection = ['ManyToMany'].includes(rel.type); %>
+      <%= propertyName %>: new FormControl(<% if (isCollection) { %>entity.<%= propertyName %> ?? []<% } else { %>entity.<%= propertyName %> ?? null<% } %>),
+      <% }); %>
     });
     return form;
   }
@@ -31,7 +48,12 @@ export class <%= entity.name %>FormService {
   }
 
   resetForm(form: <%= entity.name %>FormGroup, entity: <%= entity.name %>FormGroupInput): void {
-    form.reset(entity as any);
+    form.reset({
+      ...entity,
+      <% relationshipsForControls.forEach(rel => { const propertyName = relationshipPropertyName(rel); const isCollection = ['ManyToMany'].includes(rel.type); %>
+      <%= propertyName %>: entity.<%= propertyName %> ?? <% if (isCollection) { %>[]<% } else { %>null<% } %>,
+      <% }); %>
+    } as any);
     form.controls.id.setValue(entity.id);
   }
 }

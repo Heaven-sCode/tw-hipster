@@ -1,9 +1,92 @@
 <!-- This is an EJS template. It generates the HTML for the list component. -->
-<mat-drawer-container class="h-full bg-transparent absolute w-full">
+<%
+const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyToMany'].includes(rel.type));
+%>
+<mat-drawer-container class="absolute h-full w-full bg-transparent">
+
+  <!-- Filter Drawer -->
+  <mat-drawer #filterDrawer mode="over" position="start" class="w-full max-w-md">
+    <form class="flex h-full flex-col bg-card" [formGroup]="filtersForm" (ngSubmit)="applyFilters()">
+      <div class="flex items-center justify-between border-b px-6 py-4">
+        <h2 class="text-xl font-semibold">Advanced Filters</h2>
+        <button mat-icon-button type="button" (click)="closeFilterDrawer()">
+          <mat-icon [svgIcon]="'heroicons_mini:x-mark'"></mat-icon>
+        </button>
+      </div>
+
+      <div class="flex-auto space-y-6 overflow-y-auto px-6 py-6">
+        <ng-container *ngFor="let field of filterFields">
+          <div class="rounded-lg border border-outline px-4 py-4" [formGroup]="fieldGroup(field.key)">
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="text-base font-medium">{{ field.label }}</h3>
+              <button mat-button type="button" (click)="clearField(field.key)">Clear</button>
+            </div>
+
+            <mat-form-field class="w-full">
+              <mat-label>Operator</mat-label>
+              <mat-select formControlName="operator">
+                <mat-option value="">None</mat-option>
+                <mat-option *ngFor="let operator of field.operators" [value]="operator.key">
+                  {{ operator.label }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <ng-container *ngIf="operatorRequiresInput(field)">
+              <ng-container [ngSwitch]="currentOperatorValueType(field)">
+                <mat-form-field class="w-full" *ngSwitchCase="'string'">
+                  <mat-label>Value</mat-label>
+                  <input matInput formControlName="value" />
+                </mat-form-field>
+
+                <mat-form-field class="w-full" *ngSwitchCase="'number'">
+                  <mat-label>Value</mat-label>
+                  <input matInput type="number" formControlName="value" />
+                </mat-form-field>
+
+                <mat-form-field class="w-full" *ngSwitchCase="'date'">
+                  <mat-label>Value</mat-label>
+                  <input matInput [matDatepicker]="datePicker" formControlName="value" />
+                  <mat-datepicker-toggle matSuffix [for]="datePicker"></mat-datepicker-toggle>
+                  <mat-datepicker #datePicker></mat-datepicker>
+                </mat-form-field>
+
+                <mat-form-field class="w-full" *ngSwitchCase="'boolean'">
+                  <mat-label>Value</mat-label>
+                  <mat-select formControlName="value">
+                    <mat-option [value]="true">True</mat-option>
+                    <mat-option [value]="false">False</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field class="w-full" *ngSwitchCase="'enum'">
+                  <mat-label>Value</mat-label>
+                  <mat-select formControlName="value">
+                    <mat-option *ngFor="let option of getEnumOptions(field)" [value]="option">
+                      {{ option }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </ng-container>
+            </ng-container>
+          </div>
+        </ng-container>
+
+        <div *ngIf="!filterFields.length" class="rounded border border-dashed border-outline px-4 py-6 text-center text-sm text-disabled">
+          No filterable fields are available for this entity.
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end border-t px-6 py-4">
+        <button mat-button type="button" (click)="clearFilters()">Clear All</button>
+        <button mat-flat-button color="primary" class="ml-3" type="submit">Apply Filters</button>
+      </div>
+    </form>
+  </mat-drawer>
 
   <!-- Main Content (The Table) -->
   <mat-drawer-content class="flex flex-col">
-    <div class="absolute inset-0 flex min-w-0 flex-col overflow-hidden h-full">
+    <div class="absolute inset-0 flex min-w-0 flex-col overflow-hidden">
 
       <!-- Header -->
       <div class="bg-default dark:bg-transparent flex flex-0 flex-col p-6 pb-22 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:pb-28 sm:pt-12">
@@ -13,8 +96,12 @@
           </h2>
         </div>
         <!-- Actions -->
-        <div class="mt-6 flex shrink-0 items-center sm:ml-4 sm:mt-0">
-          <button class="ml-3" mat-flat-button [color]="'primary'" (click)="openDrawer()">
+        <div class="mt-6 flex shrink-0 items-center gap-3 sm:ml-4 sm:mt-0">
+          <button *ngIf="filterFields.length" mat-stroked-button type="button" (click)="openFilterDrawer()">
+            <mat-icon [svgIcon]="'heroicons_outline:funnel'"></mat-icon>
+            <span class="ml-2">Filters</span>
+          </button>
+          <button mat-flat-button color="primary" type="button" (click)="openFormDrawer()">
             <mat-icon [svgIcon]="'heroicons_mini:plus'"></mat-icon>
             <span class="ml-2">New <%= entity.name %></span>
           </button>
@@ -46,12 +133,15 @@
           <% }); %>
 
           <!-- Generate columns for "Show Children" buttons -->
-          <% relationships.forEach(rel => { %>
+          <% collectionRelationships.forEach(rel => { %>
           <ng-container matColumnDef="actions-<%= rel.otherEntityName %>">
             <th mat-header-cell *matHeaderCellDef> <%= rel.otherEntityNamePascalCase %> </th>
             <td mat-cell *matCellDef="let element">
               <button mat-icon-button (click)="show<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Show <%= rel.otherEntityNamePascalCase %>">
                 <mat-icon [svgIcon]="'heroicons_outline:eye'"></mat-icon>
+              </button>
+              <button mat-icon-button class="ml-2" (click)="add<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Add <%= rel.otherEntityNamePascalCase %>">
+                <mat-icon [svgIcon]="'heroicons_outline:plus-circle'"></mat-icon>
               </button>
             </td>
           </ng-container>
@@ -61,7 +151,7 @@
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef>Actions</th>
             <td mat-cell *matCellDef="let element">
-              <button mat-icon-button (click)="openDrawer(element.id)" matTooltip="Edit <%= entity.name %>">
+              <button mat-icon-button (click)="openFormDrawer(element.id)" matTooltip="Edit <%= entity.name %>">
                 <mat-icon [svgIcon]="'heroicons_outline:pencil-square'"></mat-icon>
               </button>
               <button mat-icon-button (click)="delete(element.id)" matTooltip="Delete <%= entity.name %>">
@@ -85,50 +175,14 @@
   </mat-drawer-content>
 
   <!-- Side Drawer for Form -->
-  <mat-drawer #matDrawer mode="over" position="end" class="w-1/3 min-w-96">
-    <div *ngIf="<%= toCamelCase(entity.name) %>Form" class="flex flex-col h-full p-6 bg-card">
-      <div class="pb-4 border-b">
-        <h2 class="text-2xl font-bold">{{ drawerMode === 'new' ? 'New' : 'Edit' }} <%= entity.name %></h2>
-      </div>
-      <form [formGroup]="<%= toCamelCase(entity.name) %>Form" class="flex-auto overflow-y-auto pt-6">
-        <!-- Dynamically generate form fields based on type -->
-        <% entity.fields.forEach(field => { %>
-          <% if (field.fieldTypeIsEnum) { %>
-        <!-- Mat-select for Enum -->
-        <mat-form-field class="w-full">
-          <mat-label><%= toPascalCase(field.fieldName) %></mat-label>
-          <mat-select formControlName="<%= field.fieldName %>">
-            <mat-option *ngFor="let option of <%= toCamelCase(field.fieldType) %>Options" [value]="option">
-              {{ option }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-          <% } else if (field.fieldType === 'Boolean') { %>
-        <!-- Mat-checkbox for Boolean -->
-        <mat-checkbox class="w-full my-4" formControlName="<%= field.fieldName %>">
-          <%= toPascalCase(field.fieldName) %>
-        </mat-checkbox>
-          <% } else if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>
-        <!-- Mat-datepicker for Date fields -->
-        <mat-form-field class="w-full">
-            <mat-label><%= toPascalCase(field.fieldName) %></mat-label>
-            <input matInput [matDatepicker]="picker<%= field.fieldName %>" formControlName="<%= field.fieldName %>">
-            <mat-datepicker-toggle matSuffix [for]="picker<%= field.fieldName %>"></mat-datepicker-toggle>
-            <mat-datepicker #picker<%= field.fieldName %>></mat-datepicker>
-        </mat-form-field>
-          <% } else { %>
-        <!-- Default Mat-input for other types -->
-        <mat-form-field class="w-full">
-          <mat-label><%= toPascalCase(field.fieldName) %></mat-label>
-          <input matInput formControlName="<%= field.fieldName %>" <% if (field.fieldValidateRules.includes('required')) { %>required<% } %>>
-        </mat-form-field>
-          <% } %>
-        <% }); %>
-      </form>
-      <div class="flex items-center justify-end mt-6 pt-6 border-t">
-        <button mat-button (click)="closeDrawer()">Cancel</button>
-        <button mat-flat-button color="primary" class="ml-3" (click)="save()" [disabled]="<%= toCamelCase(entity.name) %>Form.invalid">Save</button>
-      </div>
+  <mat-drawer #formDrawer mode="over" position="end" class="w-1/3 min-w-96">
+    <div class="flex h-full flex-col bg-card p-6">
+      <app-<%= toKebabCase(entity.name) %>-form
+        [entity]="selected<%= entity.name %>"
+        [heading]="drawerMode === 'new' ? 'New <%= entity.name %>' : 'Edit <%= entity.name %>'"
+        (saved)="handleFormSaved()"
+        (cancelled)="closeFormDrawer()">
+      </app-<%= toKebabCase(entity.name) %>-form>
     </div>
   </mat-drawer>
 </mat-drawer-container>

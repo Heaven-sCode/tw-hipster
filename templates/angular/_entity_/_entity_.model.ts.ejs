@@ -1,16 +1,32 @@
 import dayjs from 'dayjs/esm';
 <%
 // Logic to find unique enum and entity types to import
-const uniqueImports = new Map();
+const uniqueEnumImports = new Map();
 entity.fields.forEach(field => {
     if (field.fieldTypeIsEnum) {
-        if (!uniqueImports.has(field.fieldType)) {
-            uniqueImports.set(field.fieldType, `import { ${field.fieldType} } from '../../enums/${toKebabCase(field.fieldType)}.model';`);
+        if (!uniqueEnumImports.has(field.fieldType)) {
+            uniqueEnumImports.set(field.fieldType, `import { ${field.fieldType} } from '../../enums/${toKebabCase(field.fieldType)}.model';`);
         }
     }
 });
+
+const uniqueRelationshipImports = new Map();
+relationships.forEach(rel => {
+    if (!uniqueRelationshipImports.has(rel.otherEntityName)) {
+        uniqueRelationshipImports.set(rel.otherEntityName, `import { I${rel.otherEntityName} } from '../${toKebabCase(rel.otherEntityName)}/${toKebabCase(rel.otherEntityName)}.model';`);
+    }
+});
+
+function relationshipPropertyName(rel) {
+    const isCollection = ['OneToMany', 'ManyToMany'].includes(rel.type);
+    if (rel.from.fieldName) {
+        return toCamelCase(rel.from.fieldName);
+    }
+    return isCollection ? toCamelCase(rel.otherEntityNamePlural) : toCamelCase(rel.otherEntityName);
+}
 %>
-<%- Array.from(uniqueImports.values()).join('\n') %>
+<%- Array.from(uniqueEnumImports.values()).join('\n') %>
+<%- Array.from(uniqueRelationshipImports.values()).join('\n') %>
 
 export interface I<%= entity.name %> {
   id?: number;
@@ -31,6 +47,9 @@ export interface I<%= entity.name %> {
     const tsType = typeMap[field.fieldType] || field.fieldType;
   %>
   <%= field.fieldName %>?: <%- tsType %> | null;
+  <% }); %>
+  <% relationships.forEach(rel => { const propertyName = relationshipPropertyName(rel); const isCollection = ['OneToMany', 'ManyToMany'].includes(rel.type); %>
+  <%= propertyName %>?: <%= isCollection ? `I${rel.otherEntityName}[]` : `I${rel.otherEntityName}` %> | null;
   <% }); %>
 }
 

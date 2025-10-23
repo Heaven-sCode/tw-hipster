@@ -240,6 +240,8 @@ async function generateEntityFiles(config, entity, allRelationships) {
         { template: '_entity_.routes.ts.ejs',      subfolder: '',       outputPattern: '<%= entityName %>.routes.ts' },
         { template: '_entity_.service.ts.ejs',     subfolder: 'service',outputPattern: '<%= entityName %>.service.ts' },
         { template: '_entity_-form.service.ts.ejs',subfolder: 'update', outputPattern: '<%= entityName %>-form.service.ts' },
+        { template: '_entity_-form.component.ts.ejs', subfolder: 'form', outputPattern: '<%= entityName %>-form.component.ts' },
+        { template: '_entity_-form.component.html.ejs', subfolder: 'form', outputPattern: '<%= entityName %>-form.component.html' },
         { template: '_entity_-list.component.ts.ejs', subfolder: 'list',   outputPattern: '<%= entityName %>-list.component.ts' },
         { template: '_entity_-list.component.html.ejs', subfolder: 'list',   outputPattern: '<%= entityName %>-list.component.html' },
     ];

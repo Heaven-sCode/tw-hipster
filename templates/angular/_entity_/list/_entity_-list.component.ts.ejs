@@ -1,10 +1,9 @@
 // This is an EJS template. It generates the list component TypeScript file.
 import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { HttpResponse } from '@angular/common/http';
-import { debounceTime, distinctUntilChanged, startWith, switchMap, catchError, tap, of, merge, Subject, finalize } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
+import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { merge, of, startWith, Subject, catchError, switchMap, tap } from 'rxjs';
 
 // Angular Material & Fuse
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
@@ -13,106 +12,241 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSidenavModule, MatDrawer } from '@angular/material/sidenav';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { FuseConfirmationService } from '@fuse/services/confirmation';
 
-
 // Application Imports
-import { I<%= entity.name %>, New<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
+import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
 import { <%= entity.name %>Service } from '../service/<%= toKebabCase(entity.name) %>.service';
-import { <%= entity.name %>FormService, <%= entity.name %>FormGroup } from '../update/<%= toKebabCase(entity.name) %>-form.service';
+import { <%= entity.name %>FormComponent } from '../form/<%= toKebabCase(entity.name) %>-form.component';
+
 <%
+const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyToMany'].includes(rel.type));
+const relationshipComponentImports = new Map();
+collectionRelationships.forEach(rel => {
+  if (!relationshipComponentImports.has(rel.otherEntityName)) {
+    relationshipComponentImports.set(
+      rel.otherEntityName,
+      {
+        listImport: `import { ${rel.otherEntityName}ListComponent } from '../../${toKebabCase(rel.otherEntityName)}/list/${toKebabCase(rel.otherEntityName)}-list.component';`,
+        formImport: `import { ${rel.otherEntityName}FormComponent } from '../../${toKebabCase(rel.otherEntityName)}/form/${toKebabCase(rel.otherEntityName)}-form.component';`,
+      }
+    );
+  }
+});
+
 const uniqueEnumImports = new Map();
 entity.fields.forEach(field => {
-    if (field.fieldTypeIsEnum) {
-        if (!uniqueEnumImports.has(field.fieldType)) {
-            uniqueEnumImports.set(field.fieldType, `import { ${field.fieldType} } from '../../../enums/${toKebabCase(field.fieldType)}.model';`);
-        }
+  if (field.fieldTypeIsEnum) {
+    if (!uniqueEnumImports.has(field.fieldType)) {
+      uniqueEnumImports.set(field.fieldType, `import { ${field.fieldType} } from '../../../enums/${toKebabCase(field.fieldType)}.model';`);
     }
+  }
 });
+
+function getFilterValueType(fieldType, isEnum) {
+  if (isEnum) {
+    return 'enum';
+  }
+  const numericTypes = ['Integer', 'Long', 'Float', 'Double', 'BigDecimal'];
+  const dateTypes = ['LocalDate', 'Instant', 'ZonedDateTime'];
+  if (fieldType === 'Boolean') {
+    return 'boolean';
+  }
+  if (numericTypes.includes(fieldType)) {
+    return 'number';
+  }
+  if (dateTypes.includes(fieldType)) {
+    return 'date';
+  }
+  return 'string';
+}
+
+function relationshipFilterKey(rel) {
+  const base = rel.from.fieldName ? toCamelCase(rel.from.fieldName) : toCamelCase(rel.otherEntityName);
+  return base.endsWith('Id') ? base : `${base}Id`;
+}
 %>
+<%- Array.from(relationshipComponentImports.values()).map(entry => entry.listImport).join('\n') %>
+<%- Array.from(relationshipComponentImports.values()).map(entry => entry.formImport).join('\n') %>
 <%- Array.from(uniqueEnumImports.values()).join('\n') %>
 
+type ParentDialogData = {
+  parentFilters?: Record<string, string | number>;
+};
+
+type FilterValueType = 'string' | 'number' | 'date' | 'boolean' | 'enum';
+
+interface FilterFieldOperator {
+  key: string;
+  label: string;
+  requiresValue: boolean;
+  valueType: FilterValueType;
+}
+
+interface FilterField {
+  key: string;
+  label: string;
+  valueType: FilterValueType;
+  operators: FilterFieldOperator[];
+  rawFieldType?: string;
+  enumOptionsKey?: string;
+}
+
+const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = {
+  string: [
+    { key: 'contains', label: 'Contains', requiresValue: true, valueType: 'string' },
+    { key: 'equals', label: 'Equals', requiresValue: true, valueType: 'string' },
+    { key: 'notEquals', label: 'Not Equals', requiresValue: true, valueType: 'string' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+  number: [
+    { key: 'equals', label: 'Equals', requiresValue: true, valueType: 'number' },
+    { key: 'greaterThan', label: 'Greater Than', requiresValue: true, valueType: 'number' },
+    { key: 'greaterThanOrEqual', label: 'Greater Than Or Equal', requiresValue: true, valueType: 'number' },
+    { key: 'lessThan', label: 'Less Than', requiresValue: true, valueType: 'number' },
+    { key: 'lessThanOrEqual', label: 'Less Than Or Equal', requiresValue: true, valueType: 'number' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+  date: [
+    { key: 'equals', label: 'On', requiresValue: true, valueType: 'date' },
+    { key: 'greaterThanOrEqual', label: 'After Or Equal', requiresValue: true, valueType: 'date' },
+    { key: 'lessThanOrEqual', label: 'Before Or Equal', requiresValue: true, valueType: 'date' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+  boolean: [
+    { key: 'equals', label: 'Equals', requiresValue: true, valueType: 'boolean' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+  enum: [
+    { key: 'equals', label: 'Equals', requiresValue: true, valueType: 'enum' },
+    { key: 'notEquals', label: 'Not Equals', requiresValue: true, valueType: 'enum' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+};
 
 @Component({
   selector: 'app-<%= toKebabCase(entity.name) %>-list',
   standalone: true,
   imports: [
     CommonModule,
-    RouterModule,
     ReactiveFormsModule,
     MatTableModule,
     MatSortModule,
     MatSidenavModule,
     MatProgressSpinnerModule,
     MatButtonModule,
-    MatFormFieldModule,
     MatIconModule,
-    MatInputModule,
     MatTooltipModule,
-    MatCheckboxModule,
-    MatSelectModule,
     MatPaginatorModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
     MatDatepickerModule,
     MatNativeDateModule,
+    <%= entity.name %>FormComponent,
   ],
   templateUrl: './<%= toKebabCase(entity.name) %>-list.component.html',
 })
 export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   // --- Injected Services ---
   private readonly <%= toCamelCase(entity.name) %>Service = inject(<%= entity.name %>Service);
-  private readonly <%= toCamelCase(entity.name) %>FormService = inject(<%= entity.name %>FormService);
   private readonly fuseConfirmationService = inject(FuseConfirmationService);
-  private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly dialog = inject(MatDialog);
+  private readonly dialogRef = inject(MatDialogRef<<%= entity.name %>ListComponent>, { optional: true });
+  private readonly dialogData = inject(MAT_DIALOG_DATA, { optional: true }) as ParentDialogData | null;
+  private readonly fb = inject(FormBuilder);
 
   // --- State & Triggers ---
   isLoading = true;
   totalItems = 0;
-  itemsPerPage = 10; // Default items per page
+  itemsPerPage = 10;
   private readonly refreshTrigger = new Subject<void>();
-  private parentFilters: { [key: string]: string } = {};
+  private baseParentFilters: Record<string, string | number> = {};
+  private activeFilters: Record<string, string> = {};
+
+  selected<%= entity.name %>: I<%= entity.name %> | null = null;
+  drawerMode: 'new' | 'edit' = 'new';
+
+  <% entity.fields.forEach(field => { if (field.fieldTypeIsEnum) { %>
+  readonly <%= toCamelCase(field.fieldType) %>Options = Object.keys(<%= field.fieldType %>);
+  <% }}); %>
+
+  // --- Filter configuration ---
+  filterFields: FilterField[] = [
+    <% entity.fields.forEach(field => { 
+         const valueType = getFilterValueType(field.fieldType, field.fieldTypeIsEnum);
+         const enumOptionsKey = field.fieldTypeIsEnum ? `${toCamelCase(field.fieldType)}Options` : null;
+    %>
+    {
+      key: '<%= field.fieldName %>',
+      label: '<%= toPascalCase(field.fieldName) %>',
+      valueType: '<%= valueType %>' as FilterValueType,
+      operators: FILTER_OPERATOR_LIBRARY['<%= valueType %>'],
+      rawFieldType: '<%= field.fieldType %>'<% if (enumOptionsKey) { %>,
+      enumOptionsKey: '<%= enumOptionsKey %>'<% } %>
+    },
+    <% }); %>
+    <% relationships.filter(rel => ['ManyToOne', 'OneToOne'].includes(rel.type)).forEach(rel => { 
+         const key = relationshipFilterKey(rel);
+         const label = rel.from.fieldName ? toPascalCase(rel.from.fieldName) : rel.otherEntityNamePascalCase;
+    %>
+    {
+      key: '<%= key %>',
+      label: '<%= label %>',
+      valueType: 'number' as FilterValueType,
+      operators: FILTER_OPERATOR_LIBRARY['number'],
+      rawFieldType: 'Long'
+    },
+    <% }); %>
+  ];
+
+  filtersForm: FormGroup = this.buildFiltersForm();
 
   // --- Table & Drawer ---
-  @ViewChild('matDrawer') matDrawer!: MatDrawer;
+  @ViewChild('filterDrawer') filterDrawer!: MatDrawer;
+  @ViewChild('formDrawer') formDrawer!: MatDrawer;
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
-  
-  displayedColumns: string[] = ['id', <% entity.fields.forEach(field => { %>'<%= field.fieldName %>', <% }); %><% if (relationships.length > 0) { %><% relationships.forEach(rel => { %>'actions-<%= rel.otherEntityName %>',<% }); %><% } %> 'actions'];
+
+  displayedColumns: string[] = ['id', <% entity.fields.forEach(field => { %>'<%= field.fieldName %>', <% }); %><% if (collectionRelationships.length > 0) { %><% collectionRelationships.forEach(rel => { %>'actions-<%= rel.otherEntityName %>',<% }); %><% } %> 'actions'];
   dataSource = new MatTableDataSource<I<%= entity.name %>>();
-  
-  // --- Form ---
-  <%= toCamelCase(entity.name) %>Form!: <%= entity.name %>FormGroup;
-  drawerMode: 'new' | 'edit' = 'new';
-  
-  <% entity.fields.forEach(field => { %>
-  <% if (field.fieldTypeIsEnum) { %>
-  <%= toCamelCase(field.fieldType) %>Options = Object.keys(<%= field.fieldType %>);
-  <% } %>
-  <% }); %>
 
   ngOnInit(): void {
+    if (this.dialogData?.parentFilters) {
+      this.baseParentFilters = { ...this.dialogData.parentFilters };
+    }
   }
-  
+
   ngAfterViewInit(): void {
-    this.route.params.pipe(
-      switchMap(params => {
-        this.parentFilters = {};
-        const parentIdKey = Object.keys(params)[0]; 
-        if (parentIdKey) {
-          const parentModelName = parentIdKey.replace('Id', '');
-          this.parentFilters[`${parentModelName}Id.equals`] = params[parentIdKey];
-        }
-        return merge(this.sort.sortChange, this.paginator.page, this.refreshTrigger).pipe(startWith({}));
-      })
-    ).subscribe(() => this.loadData());
+    const triggers$ = merge(this.sort.sortChange, this.paginator.page, this.refreshTrigger).pipe(startWith({}));
+
+    if (this.dialogData?.parentFilters) {
+      triggers$.subscribe(() => this.loadData());
+    } else {
+      this.route.params
+        .pipe(
+          tap(params => {
+            this.baseParentFilters = {};
+            const parentIdKey = Object.keys(params)[0];
+            if (parentIdKey) {
+              const parentModelName = parentIdKey.replace('Id', '');
+              this.baseParentFilters[`${parentModelName}Id.equals`] = params[parentIdKey];
+            }
+          }),
+          switchMap(() => triggers$)
+        )
+        .subscribe(() => this.loadData());
+    }
+
     this.loadData();
   }
 
@@ -126,7 +260,8 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
       page: this.paginator.pageIndex,
       size: this.paginator.pageSize,
       sort: this.getSortParameters(),
-      ...this.parentFilters,
+      ...this.baseParentFilters,
+      ...this.activeFilters,
     };
 
     this.<%= toCamelCase(entity.name) %>Service.query(req).pipe(
@@ -149,52 +284,49 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     return [`${this.sort.active},${this.sort.direction}`];
   }
 
-  openDrawer(id?: number): void {
+  openFormDrawer(id?: number): void {
     if (id) {
       this.drawerMode = 'edit';
       this.<%= toCamelCase(entity.name) %>Service.find(id).subscribe(response => {
         if (response.body) {
-          this.<%= toCamelCase(entity.name) %>Form = this.<%= toCamelCase(entity.name) %>FormService.create<%= entity.name %>FormGroup(response.body);
-          this.matDrawer.open();
+          this.selected<%= entity.name %> = response.body;
+          this.formDrawer.open();
         }
       });
     } else {
       this.drawerMode = 'new';
-      this.<%= toCamelCase(entity.name) %>Form = this.<%= toCamelCase(entity.name) %>FormService.create<%= entity.name %>FormGroup();
-      this.matDrawer.open();
+      this.selected<%= entity.name %> = null;
+      this.formDrawer.open();
     }
   }
 
-  closeDrawer(): void {
-    this.matDrawer.close();
+  closeFormDrawer(): void {
+    this.formDrawer.close();
   }
 
-  save(): void {
-    if (this.<%= toCamelCase(entity.name) %>Form.invalid) {
-      return;
-    }
-    
-    const <%= toCamelCase(entity.name) %> = this.<%= toCamelCase(entity.name) %>FormService.get<%= entity.name %>(this.<%= toCamelCase(entity.name) %>Form);
-    
-    const saveObservable = 
-      this.drawerMode === 'new'
-        ? this.<%= toCamelCase(entity.name) %>Service.create(<%= toCamelCase(entity.name) %> as New<%= entity.name %>)
-        : this.<%= toCamelCase(entity.name) %>Service.update(<%= toCamelCase(entity.name) %>);
+  openFilterDrawer(): void {
+    this.filterDrawer.open();
+  }
 
-    saveObservable.pipe(finalize(() => this.closeDrawer())).subscribe(() => {
-      this.refreshTrigger.next();
-      this.loadData();
-    });
+  closeFilterDrawer(): void {
+    this.filterDrawer.close();
+  }
+
+  handleFormSaved(): void {
+    this.closeFormDrawer();
+    this.refreshTrigger.next();
+    this.loadData();
+    this.dialogRef?.close(true);
   }
 
   delete(id: number): void {
     const confirmation = this.fuseConfirmationService.open({
       title: 'Delete <%= entity.name %>',
       message: 'Are you sure you want to delete this? This action cannot be undone.',
-      actions: { confirm: { label: 'Delete' } }
+      actions: { confirm: { label: 'Delete' } },
     });
 
-    confirmation.afterClosed().subscribe((result) => {
+    confirmation.afterClosed().subscribe(result => {
       if (result === 'confirmed') {
         this.<%= toCamelCase(entity.name) %>Service.delete(id).subscribe(() => {
           this.refreshTrigger.next();
@@ -203,10 +335,162 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
       }
     });
   }
-  
-  <% relationships.forEach(rel => { %>
-  show<%= rel.otherEntityNamePascalCase %>(element: I<%= entity.name %>): void {
-    this.router.navigate(['/<%= toKebabCase(entity.name) %>', element.id, '/<%= toKebabCase(rel.otherEntityNamePlural) %>']);
+
+  applyFilters(): void {
+    const filters: Record<string, string> = {};
+
+    this.filterFields.forEach(field => {
+      const group = this.fieldGroup(field.key);
+      const operator = group?.get('operator')?.value as string | undefined;
+      if (!operator) {
+        return;
+      }
+      const operatorConfig = field.operators.find(item => item.key === operator);
+      if (!operatorConfig) {
+        return;
+      }
+      const rawValue = group.get('value')?.value;
+      if (operatorConfig.requiresValue) {
+        if (rawValue === null || rawValue === '' || (Array.isArray(rawValue) && rawValue.length === 0)) {
+          return;
+        }
+      }
+
+      let paramValue: string | null = null;
+      switch (operatorConfig.valueType) {
+        case 'boolean': {
+          const boolValue = rawValue === true || rawValue === 'true';
+          paramValue = boolValue ? 'true' : 'false';
+          break;
+        }
+        case 'number': {
+          const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue);
+          if (Number.isNaN(numeric)) {
+            return;
+          }
+          paramValue = String(numeric);
+          break;
+        }
+        case 'date': {
+          if (rawValue instanceof Date) {
+            if (field.rawFieldType === 'LocalDate') {
+              const iso = rawValue.toISOString();
+              paramValue = iso.split('T')[0];
+            } else {
+              paramValue = rawValue.toISOString();
+            }
+          } else if (typeof rawValue === 'string' && rawValue) {
+            paramValue = rawValue;
+          }
+          break;
+        }
+        default: {
+          if (rawValue !== null && rawValue !== undefined) {
+            paramValue = String(rawValue);
+          }
+        }
+      }
+
+      if (paramValue === null) {
+        return;
+      }
+
+      filters[`${field.key}.${operator}`] = paramValue;
+    });
+
+    this.activeFilters = filters;
+    if (this.paginator) {
+      this.paginator.firstPage();
+    }
+    this.refreshTrigger.next();
+    this.loadData();
+    this.closeFilterDrawer();
+  }
+
+  clearFilters(): void {
+    this.filterFields.forEach(field => this.clearField(field.key));
+    this.activeFilters = {};
+    if (this.paginator) {
+      this.paginator.firstPage();
+    }
+    this.refreshTrigger.next();
+    this.loadData();
+  }
+
+  clearField(key: string): void {
+    const group = this.fieldGroup(key);
+    group?.setValue({ operator: '', value: null });
+  }
+
+  fieldGroup(key: string): FormGroup | null {
+    return this.filtersForm.get(key) as FormGroup | null;
+  }
+
+  operatorRequiresInput(field: FilterField): boolean {
+    const config = this.currentOperatorConfig(field);
+    return !!config?.requiresValue;
+  }
+
+  currentOperatorValueType(field: FilterField): FilterValueType {
+    return this.currentOperatorConfig(field)?.valueType ?? field.valueType;
+  }
+
+  getEnumOptions(field: FilterField): string[] {
+    if (!field.enumOptionsKey) {
+      return [];
+    }
+    return (this as any)[field.enumOptionsKey] ?? [];
+  }
+
+  <% collectionRelationships.forEach(rel => { 
+      const parentFilterField = rel.to.fieldName ? toCamelCase(rel.to.fieldName) : toCamelCase(entity.name);
+      const filterKey = `${parentFilterField}Id.equals`;
+      const methodSuffix = rel.otherEntityNamePascalCase;
+  %>
+  show<%= methodSuffix %>(element: I<%= entity.name %>): void {
+    this.dialog.open(<%= rel.otherEntityName %>ListComponent, {
+      width: '960px',
+      data: {
+        parentFilters: { '<%= filterKey %>': element.id ?? null },
+      },
+    });
+  }
+
+  add<%= methodSuffix %>(element: I<%= entity.name %>): void {
+    const dialogRef = this.dialog.open(<%= rel.otherEntityName %>FormComponent, {
+      width: '720px',
+      data: {
+        defaults: { <%= rel.type === 'ManyToMany' ? `${parentFilterField}: (element ? [element] : [])` : `${parentFilterField}: element` %> },
+        heading: 'New <%= rel.otherEntityName %> for <%= entity.name %>',
+      },
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.refreshTrigger.next();
+        this.loadData();
+      }
+    });
   }
   <% }); %>
+
+  private buildFiltersForm(): FormGroup {
+    const groupConfig = this.filterFields.reduce((acc, field) => {
+      acc[field.key] = this.fb.group({
+        operator: [''],
+        value: [null],
+      });
+      return acc;
+    }, {} as Record<string, FormGroup>);
+    return this.fb.group(groupConfig);
+  }
+
+  private currentOperatorConfig(field: FilterField): FilterFieldOperator | undefined {
+    const group = this.fieldGroup(field.key);
+    if (!group) {
+      return undefined;
+    }
+    const operator = group.get('operator')?.value as string | undefined;
+    return field.operators.find(item => item.key === operator);
+  }
 }

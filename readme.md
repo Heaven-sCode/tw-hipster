@@ -1,4 +1,4 @@
-# Hipster Wind
+# TW-Hipster
 
 [![NPM Version](https://img.shields.io/npm/v/tw-hipster.svg)](https://www.npmjs.com/package/tw-hipster)
 [![NPM License](https://img.shields.io/npm/l/tw-hipster.svg)](https://www.npmjs.com/package/tw-hipster)
@@ -21,8 +21,10 @@ It takes the best part of JHipster—the powerful JDL for defining your data mod
 
 For each entity defined in your JDL, `tw-hipster` creates a complete set of files following modern Angular best practices:
 
-* **Standalone Components**: A list component with a data table, sorting, pagination, and a side-drawer for creating and editing records. No `ngModule` required.
-* **Typed Reactive Forms**: A dedicated form service (`entity-form.service.ts`) that creates a strongly-typed `FormGroup` for your entity.
+* **Standalone Components**: A list component with a data table, sorting, pagination, relationship-aware dialogs for children, and a side-drawer powered by a reusable form. No `ngModule` required.
+* **Reusable Form Components**: Each entity gets an `entity-form.component` that encapsulates the reactive form, handles create/update flows, and can be launched standalone or inside dialogs (perfect for nested relations).
+* **Typed Reactive Forms**: A dedicated form service (`entity-form.service.ts`) that creates a strongly-typed `FormGroup` for your entity, including relationship controls derived from your JDL.
+* **Advanced Filtering**: Every list view ships with a JPA meta-model aware filter drawer (equals, contains, ranges, specified, etc.) so your end users can slice data without touching the backend.
 * **Data Services**: A clean service (`entity.service.ts`) for handling all HTTP operations (CRUD), with date handling and request options built-in.
 * **TypeScript Models**: Interfaces for your entities (`entity.model.ts`) and TypeScript enums (`enum.model.ts`).
 * **Routing**: A pre-configured routes file (`entity.routes.ts`) for easy integration into your application's router.
