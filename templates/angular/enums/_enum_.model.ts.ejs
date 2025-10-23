@@ -1,0 +1,6 @@
+// This is an EJS template. It generates the enum file.
+export enum <%= enumDef.name %> {
+  <% enumDef.values.forEach((value, index) => { %>
+  <%= value.name.toUpperCase() %> = '<%= value.name.toUpperCase() %>'<%= index < enumDef.values.length - 1 ? ',' : '' %>
+  <% }); %>
+}

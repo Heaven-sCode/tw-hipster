@@ -1,0 +1,17 @@
+import { Routes } from '@angular/router';
+import { <%= entity.name %>ListComponent } from './list/<%= toKebabCase(entity.name) %>-list.component';
+
+export default [
+  {
+    path: '',
+    component: <%= entity.name %>ListComponent,
+  },
+  <% relationships.forEach(rel => { %>
+  // Route to show children of this entity
+  // e.g., /customers/:customerId/orders
+  {
+    path: ':<%= toCamelCase(entity.name) %>Id/<%= toKebabCase(rel.otherEntityNamePlural) %>',
+    loadComponent: () => import('../<%= toKebabCase(rel.otherEntityName) %>/list/<%= toKebabCase(rel.otherEntityName) %>-list.component').then(m => m.<%= rel.otherEntityNamePascalCase %>ListComponent),
+  },
+  <% }); %>
+] as Routes;

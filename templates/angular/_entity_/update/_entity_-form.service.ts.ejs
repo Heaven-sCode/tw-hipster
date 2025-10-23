@@ -1,0 +1,37 @@
+import { Injectable } from '@angular/core';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { I<%= entity.name %>, New<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
+
+type <%= entity.name %>FormGroupInput = I<%= entity.name %> | Partial<New<%= entity.name %>>;
+type <%= entity.name %>FormRawValue = I<%= entity.name %>;
+export type <%= entity.name %>FormGroup = FormGroup<{
+  id: FormControl<I<%= entity.name %>['id'] | New<%= entity.name %>['id']>;
+  <% entity.fields.forEach(field => { %>
+  <%= field.fieldName %>: FormControl<I<%= entity.name %>['<%= field.fieldName %>']>;
+  <% }); %>
+}>;
+
+@Injectable({ providedIn: 'root' })
+export class <%= entity.name %>FormService {
+  create<%= entity.name %>FormGroup(entity: <%= entity.name %>FormGroupInput = { id: null }): <%= entity.name %>FormGroup {
+    const form = new FormGroup({
+      id: new FormControl(
+        { value: entity.id, disabled: true },
+        { nonNullable: true, validators: [Validators.required] }
+      ),
+      <% entity.fields.forEach(field => { %>
+      <%= field.fieldName %>: new FormControl(entity.<%= field.fieldName %><% if (field.fieldValidateRules.includes('required')) { %>, Validators.required<% } %>),
+      <% }); %>
+    });
+    return form;
+  }
+
+  get<%= entity.name %>(form: <%= entity.name %>FormGroup): I<%= entity.name %> | New<%= entity.name %> {
+    return form.getRawValue() as I<%= entity.name %> | New<%= entity.name %>;
+  }
+
+  resetForm(form: <%= entity.name %>FormGroup, entity: <%= entity.name %>FormGroupInput): void {
+    form.reset(entity as any);
+    form.controls.id.setValue(entity.id);
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "tw-hipster",
+  "version": "1.0.17",
+  "description": "A JDL-to-Angular code generator",
+  "main": "cli.js",
+  "bin": {
+    "tw-hipster": "./cli.js"
+  },
+  "preferGlobal": true,
+  "dependencies": {
+    "ejs": "^3.1.8",
+    "fs-extra": "^10.1.0",
+    "inquirer": "^8.2.4",
+    "jhipster-core": "^7.3.4",
+    "lodash": "^4.17.21",
+    "yargs": "^17.5.1"
+  },
+  "license": "Apache-2.0",
+
+ 
+    "repository": {
+    "type": "git",
+    "url": "https://github.com/Heaven-sCode/fhipster.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Heaven-sCode/fhipster/issues"
+  },
+  "homepage": "https://github.com/Heaven-sCode/fhipster/wiki"
+}

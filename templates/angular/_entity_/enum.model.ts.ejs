@@ -1,0 +1,29 @@
+// This is an EJS template. It generates the TypeScript interface for the entity.
+import dayjs from 'dayjs/esm';
+<%
+// Logic to find unique enum and entity types to import
+const fieldTypes = new Set();
+entity.fields.forEach(field => {
+    if (field.fieldTypeIsEnum) {
+        fieldTypes.add({ type: 'enum', name: field.fieldType });
+    } else if (field.fieldTypeIsEntity) {
+        fieldTypes.add({ type: 'entity', name: field.fieldType });
+    }
+});
+%>
+<% for (const fieldType of fieldTypes) { %>
+<% if (fieldType.type === 'enum') { %>
+import { <%= fieldType.name %> } from 'app/entities/enumerations/<%= toKebabCase(fieldType.name) %>.model';
+<% } else if (fieldType.type === 'entity') { %>
+import { I<%= fieldType.name %> } from 'app/entities/<%= toKebabCase(fieldType.name) %>/<%= toKebabCase(fieldType.name) %>.model';
+<% } %>
+<% } %>
+
+export interface I<%= entity.name %> {
+  id: number;
+  <% entity.fields.forEach(field => { %>
+  <%= field.fieldName %>?: <%= field.fieldType === 'Instant' || field.fieldType === 'LocalDate' ? 'dayjs.Dayjs' : field.fieldType %> | null;
+  <% }); %>
+}
+
+export type New<%= entity.name %> = Omit<I<%= entity.name %>, 'id'> & { id: null };

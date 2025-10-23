@@ -1,0 +1,37 @@
+import dayjs from 'dayjs/esm';
+<%
+// Logic to find unique enum and entity types to import
+const uniqueImports = new Map();
+entity.fields.forEach(field => {
+    if (field.fieldTypeIsEnum) {
+        if (!uniqueImports.has(field.fieldType)) {
+            uniqueImports.set(field.fieldType, `import { ${field.fieldType} } from '../../enums/${toKebabCase(field.fieldType)}.model';`);
+        }
+    }
+});
+%>
+<%- Array.from(uniqueImports.values()).join('\n') %>
+
+export interface I<%= entity.name %> {
+  id?: number;
+  <% entity.fields.forEach(field => { %>
+  <%
+    // Map JDL types to TypeScript types
+    const typeMap = {
+      'Integer': 'number',
+      'Long': 'number',
+      'Float': 'number',
+      'Double': 'number',
+      'BigDecimal': 'number',
+      'Instant': 'dayjs.Dayjs',
+      'LocalDate': 'dayjs.Dayjs',
+      'ZonedDateTime': 'dayjs.Dayjs',
+      'Boolean': 'boolean'
+    };
+    const tsType = typeMap[field.fieldType] || field.fieldType;
+  %>
+  <%= field.fieldName %>?: <%- tsType %> | null;
+  <% }); %>
+}
+
+export type New<%= entity.name %> = Omit<I<%= entity.name %>, 'id'> & { id: null };
