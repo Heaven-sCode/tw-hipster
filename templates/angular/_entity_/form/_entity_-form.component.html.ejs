@@ -1,76 +1,153 @@
 <!-- Reusable form component template -->
-<form class="flex h-full flex-col" [formGroup]="form" (ngSubmit)="onSubmit()">
-  <div class="flex items-center justify-between border-b pb-4">
-    <h2 class="text-2xl font-bold">
-      {{ heading || (isEditMode ? 'Edit <%= entity.name %>' : 'New <%= entity.name %>') }}
-    </h2>
-    <mat-icon *ngIf="isSaving" class="animate-spin">autorenew</mat-icon>
+<form
+  class="flex h-full min-h-0 w-full min-w-0 max-w-none flex-1 flex-col self-stretch"
+  [formGroup]="form"
+  (ngSubmit)="onSubmit()"
+>
+  <div class="flex items-start justify-between gap-4 border-b border-neutral-200 pb-5">
+    <div class="min-w-0">
+      <h2 class="text-2xl font-bold tracking-tight text-neutral-950">
+        {{
+          heading || (isEditMode ? 'Edit <%= entity.name %>' : 'New <%= entity.name %>')
+        }}
+      </h2>
+    </div>
+
+    @if (isSaving) {
+      <mat-icon class="mt-1 animate-spin text-primary">autorenew</mat-icon>
+    }
   </div>
 
-  <div class="flex-auto space-y-4 overflow-y-auto pt-6">
-    <% entity.fields.forEach(field => { %>
-      <% if (field.fieldTypeIsEnum) { %>
-    <mat-form-field class="w-full">
-      <mat-label><%= toPascalCase(field.fieldName) %></mat-label>
-      <mat-select formControlName="<%= field.fieldName %>">
-        <mat-option *ngFor="let option of <%= toCamelCase(field.fieldType) %>Options" [value]="option">
-          {{ option }}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
-      <% } else if (field.fieldType === 'Boolean') { %>
-    <mat-checkbox class="w-full" formControlName="<%= field.fieldName %>">
-      <%= toPascalCase(field.fieldName) %>
-    </mat-checkbox>
-      <% } else if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>
-    <mat-form-field class="w-full">
-      <mat-label><%= toPascalCase(field.fieldName) %></mat-label>
-      <input matInput [matDatepicker]="picker<%= field.fieldName %>" formControlName="<%= field.fieldName %>">
-      <mat-datepicker-toggle matSuffix [for]="picker<%= field.fieldName %>"></mat-datepicker-toggle>
-      <mat-datepicker #picker<%= field.fieldName %>></mat-datepicker>
-    </mat-form-field>
-      <% } else { %>
-    <mat-form-field class="w-full">
-      <mat-label><%= toPascalCase(field.fieldName) %></mat-label>
-      <input matInput formControlName="<%= field.fieldName %>" <% if (field.fieldValidateRules.includes('required')) { %>required<% } %>>
-    </mat-form-field>
-      <% } %>
-    <% }); %>
-
-    <% const relationshipsForControls = relationships.filter(rel => rel.type !== 'OneToMany'); %>
-    <% relationshipsForControls.forEach(rel => {
-         const propertyName = (function () {
-           const isCollection = ['OneToMany', 'ManyToMany'].includes(rel.type);
-           if (rel.from.fieldName) {
-             return toCamelCase(rel.from.fieldName);
-           }
-           return isCollection ? toCamelCase(rel.otherEntityNamePlural) : toCamelCase(rel.otherEntityName);
-         })();
-         const otherEntityCamel = toCamelCase(rel.otherEntityName);
-         const displayField = rel.to.fieldName ? toCamelCase(rel.to.fieldName) : 'id';
-         const isMultiple = rel.type === 'ManyToMany';
-    %>
-    <mat-form-field class="w-full">
-      <mat-label><%= rel.otherEntityNamePascalCase %></mat-label>
-      <mat-select formControlName="<%= propertyName %>" [compareWith]="compareEntityById"<% if (isMultiple) { %> multiple<% } %>>
-        <% if (!isMultiple) { %>
-        <mat-option [value]="null">None</mat-option>
+  <div class="flex-auto w-full min-w-0 overflow-y-auto py-6">
+    <div class="flex w-full min-w-0 max-w-none flex-1 flex-col items-stretch gap-4 self-stretch">
+      <% entity.fields.forEach(field => { %>
+        <% if (field.fieldTypeIsEnum) { %>
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="block w-full min-w-0 max-w-none self-stretch"
+      >
+        <mat-label><%= toPascalCase(field.fieldName) %></mat-label>
+        <mat-select formControlName="<%= field.fieldName %>">
+          <mat-option
+            *ngFor="let option of <%= toCamelCase(field.fieldType) %>Options"
+            [value]="option"
+          >
+            {{ option }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+        <% } else if (field.fieldType === 'Boolean') { %>
+      <div class="w-full min-w-0 self-stretch rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4">
+        <mat-checkbox formControlName="<%= field.fieldName %>">
+          <%= toPascalCase(field.fieldName) %>
+        </mat-checkbox>
+      </div>
+        <% } else if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="block w-full min-w-0 max-w-none self-stretch"
+      >
+        <mat-label><%= toPascalCase(field.fieldName) %></mat-label>
+        <input
+          matInput
+          [matDatepicker]="picker<%= field.fieldName %>"
+          formControlName="<%= field.fieldName %>"
+        />
+        <mat-datepicker-toggle
+          matSuffix
+          [for]="picker<%= field.fieldName %>"
+        ></mat-datepicker-toggle>
+        <mat-datepicker #picker<%= field.fieldName %>></mat-datepicker>
+      </mat-form-field>
+        <% } else { %>
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="block w-full min-w-0 max-w-none self-stretch"
+      >
+        <mat-label><%= toPascalCase(field.fieldName) %></mat-label>
+        <% if (field.fieldName.toLowerCase().includes('message') || field.fieldName.toLowerCase().includes('description') || field.fieldName.toLowerCase().includes('content') || field.fieldName.toLowerCase().includes('remark')) { %>
+        <textarea
+          matInput
+          formControlName="<%= field.fieldName %>"
+          <% if (field.fieldValidateRules.includes('required')) { %>required<% } %>
+          rows="5"
+          class="resize-y"
+        ></textarea>
+        <% } else { %>
+        <input
+          matInput
+          <% if (['Integer', 'Long', 'Float', 'Double', 'BigDecimal'].includes(field.fieldType)) { %>type="number"<% } %>
+          formControlName="<%= field.fieldName %>"
+          <% if (field.fieldValidateRules.includes('required')) { %>required<% } %>
+        />
         <% } %>
-        <mat-option *ngFor="let option of <%= otherEntityCamel %>Options" [value]="option">
-          {{ option.<%= displayField %> ?? option.id }}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
-    <% }); %>
+      </mat-form-field>
+        <% } %>
+      <% }); %>
+
+      <% const relationshipsForControls = relationships.filter(rel => rel.type !== 'OneToMany'); %>
+      <% relationshipsForControls.forEach(rel => {
+           const propertyName = (function () {
+             const isCollection = ['OneToMany', 'ManyToMany'].includes(rel.type);
+             if (rel.from.fieldName) {
+               return toCamelCase(rel.from.fieldName);
+             }
+             return isCollection ? toCamelCase(rel.otherEntityNamePlural) : toCamelCase(rel.otherEntityName);
+           })();
+           const otherEntityCamel = toCamelCase(rel.otherEntityName);
+           const displayField = rel.to.fieldName ? toCamelCase(rel.to.fieldName) : 'id';
+           const isMultiple = rel.type === 'ManyToMany';
+      %>
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="block w-full min-w-0 max-w-none self-stretch"
+      >
+        <mat-label><%= rel.otherEntityNamePascalCase %></mat-label>
+        <mat-select
+          formControlName="<%= propertyName %>"
+          [compareWith]="compareEntityById"
+          <% if (isMultiple) { %>multiple<% } %>
+        >
+          <% if (!isMultiple) { %>
+          <mat-option [value]="null">None</mat-option>
+          <% } %>
+          <mat-option
+            *ngFor="let option of <%= otherEntityCamel %>Options"
+            [value]="option"
+          >
+            {{ option.<%= displayField %> ?? option.id }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <% }); %>
+    </div>
   </div>
 
-  <div *ngIf="errorMessage" class="mt-2 rounded bg-warn-100 px-4 py-2 text-warn-900">
-    {{ errorMessage }}
-  </div>
+  @if (errorMessage) {
+    <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ errorMessage }}
+    </div>
+  }
 
-  <div class="mt-6 flex items-center justify-end border-t pt-6">
-    <button type="button" mat-button (click)="onCancel()">Cancel</button>
-    <button type="submit" mat-flat-button color="primary" class="ml-3" [disabled]="form.invalid || isSaving">
+  <div class="mt-6 flex flex-col-reverse gap-3 border-t border-neutral-200 pt-5 sm:flex-row sm:items-center sm:justify-end">
+    <button
+      type="button"
+      mat-button
+      (click)="onCancel()"
+    >
+      Cancel
+    </button>
+
+    <button
+      type="submit"
+      mat-flat-button
+      color="primary"
+      [disabled]="form.invalid || isSaving"
+    >
       <span *ngIf="!isSaving">Save</span>
       <span *ngIf="isSaving">Saving…</span>
     </button>
