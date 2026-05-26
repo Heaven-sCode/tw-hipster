@@ -110,6 +110,129 @@ function parseJdl(jdlContent) {
             to: { name: relMatch[4], fieldName: relMatch[5] },
         });
     }
+    return {
+        entities: Object.values(entities),
+        enums: Object.values(enums),
+        relationships,
+    };
+}
+
+/**
+ * A robust GDL parser that reads a GDL string and extracts entities, enums, and relationships.
+ * It maps GDL field types to JDL equivalents to ensure template compatibility.
+ * @param {string} gdlContent - The raw string content of the GDL file.
+ * @returns {{entities: Array, enums: Array, relationships: Array}}
+ */
+function parseGdl(gdlContent) {
+    const entities = {};
+    const enums = {};
+    const relationships = [];
+
+    // Remove block comments
+    const cleanContent = gdlContent.replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // 1. Parse Enums (Syntax is identical to JDL)
+    const enumRegex = /enum\s+(\w+)\s*\{([^}]+)\}/g;
+    let enumMatch;
+    while ((enumMatch = enumRegex.exec(cleanContent)) !== null) {
+        if (isCommented(cleanContent, enumMatch.index)) continue;
+        const enumName = enumMatch[1];
+        const values = enumMatch[2].trim().split(',').map(v => v.trim().split('(')[0].trim()).filter(Boolean);
+        enums[enumName] = { name: enumName, values: values.map(v => ({ name: v })) };
+    }
+
+    // GDL type normalization map (maps lower-case/GDL types to JDL PascalCase types)
+    const normalizeGdlType = (gdlType) => {
+        const typeMappings = {
+            string: 'String',
+            bool: 'Boolean',
+            int: 'Integer',
+            long: 'Long',
+            double: 'Double',
+            bigDecimal: 'BigDecimal',
+            date: 'LocalDate',
+            datetime: 'Instant',
+        };
+        return typeMappings[gdlType] || gdlType;
+    };
+
+    // 2. Parse Entities and fields
+    // Syntax: @Audited @Searchable entity Toplevel { ... }
+    const entityRegex = /((?:@\w+\s+)*)entity\s+(\w+)\s*\{([^}]+)\}/g;
+    let entityMatch;
+    while ((entityMatch = entityRegex.exec(cleanContent)) !== null) {
+        if (isCommented(cleanContent, entityMatch.index)) continue;
+        
+        const annotationsStr = entityMatch[1] || '';
+        const hasAuditAnnotation = annotationsStr.includes('@Audited');
+        const entityName = entityMatch[2];
+        const fieldsContent = entityMatch[3];
+        
+        const fields = [];
+        const fieldLines = fieldsContent.split('\n').map(l => l.trim()).filter(line => line && !line.startsWith('//'));
+
+        fieldLines.forEach(line => {
+            // GDL field syntax: <fieldType> <fieldName> [validations] [comment]
+            const fieldMatch = line.match(/^([\w<>]+)\s+(\w+)(.*)/);
+            if (fieldMatch) {
+                const rawFieldType = fieldMatch[1];
+                const fieldName = fieldMatch[2];
+                const restOfLine = fieldMatch[3] || '';
+
+                let validations = restOfLine;
+                let comment = null;
+
+                const commentIndex = restOfLine.indexOf('//');
+                if (commentIndex !== -1) {
+                    validations = restOfLine.substring(0, commentIndex).trim();
+                    comment = restOfLine.substring(commentIndex + 2).trim();
+                }
+
+                const fieldType = normalizeGdlType(rawFieldType);
+                
+                fields.push({
+                    fieldName,
+                    fieldType,
+                    fieldTypeIsEnum: !!enums[fieldType],
+                    fieldValidateRules: validations.split(/\s+/).filter(Boolean),
+                    comment,
+                });
+            }
+        });
+        
+        if (hasAuditAnnotation) {
+            console.log(`  -> Audit fields enabled for entity: ${entityName}`);
+            fields.push(...AUDIT_FIELDS);
+        }
+
+        entities[entityName] = { name: entityName, fields };
+    }
+
+    // 3. Parse Relationships
+    // Syntax:
+    // relationship OneToOne {
+    //     Institute{user(login)} to User
+    // }
+    const relBlockRegex = /relationship\s+(OneToOne|ManyToOne|OneToMany|ManyToMany)\s*\{([\s\S]*?)\n\}/g;
+    let blockMatch;
+    while ((blockMatch = relBlockRegex.exec(cleanContent)) !== null) {
+        if (isCommented(cleanContent, blockMatch.index)) continue;
+        const relType = blockMatch[1];
+        const blockContent = blockMatch[2];
+        const lines = blockContent.split('\n').map(l => l.trim()).filter(line => line && !line.startsWith('//'));
+
+        lines.forEach(line => {
+            const relLineRegex = /^(\w+)(?:\{([\w()]+)\})?\s+to\s+(\w+)(?:\{([\w()]+)\})?/;
+            const lineMatch = line.match(relLineRegex);
+            if (lineMatch) {
+                relationships.push({
+                    type: relType,
+                    from: { name: lineMatch[1], fieldName: lineMatch[2] },
+                    to: { name: lineMatch[3], fieldName: lineMatch[4] },
+                });
+            }
+        });
+    }
 
     return {
         entities: Object.values(entities),
@@ -169,12 +292,13 @@ async function run() {
 
     const config = await gatherConfiguration(argv);
 
-    console.log(`🔵 Parsing JDL file: ${config.jdlFile}`);
-    const jdlContent = fs.readFileSync(config.jdlFile, 'utf-8');
-    const { entities, enums, relationships } = parseJdl(jdlContent);
+    const isGdl = config.jdlFile.toLowerCase().endsWith('.gdl');
+    console.log(`🔵 Parsing ${isGdl ? 'GDL' : 'JDL'} file: ${config.jdlFile}`);
+    const fileContent = fs.readFileSync(config.jdlFile, 'utf-8');
+    const { entities, enums, relationships } = isGdl ? parseGdl(fileContent) : parseJdl(fileContent);
 
     if (!entities.length) {
-        console.error('❌ No entities found in the JDL file. Exiting.');
+        console.error(`❌ No entities found in the ${isGdl ? 'GDL' : 'JDL'} file. Exiting.`);
         return;
     }
 

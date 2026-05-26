@@ -30,7 +30,7 @@ function relationshipPropertyName(rel) {
 const relationshipsForControls = relationships.filter(rel => rel.type !== 'OneToMany');
 const relationshipImports = new Map();
 relationshipsForControls.forEach(rel => {
-  if (!relationshipImports.has(rel.otherEntityName)) {
+  if (rel.otherEntityName !== entity.name && !relationshipImports.has(rel.otherEntityName)) {
     relationshipImports.set(
       rel.otherEntityName,
       {
@@ -107,7 +107,9 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
        const otherEntityPascal = rel.otherEntityName;
        const optionsProperty = `${otherEntityCamel}Options`;
   %>
+  <% if (rel.otherEntityName !== entity.name) { %>
   private readonly <%= otherEntityCamel %>Service = inject(<%= otherEntityPascal %>Service);
+  <% } %>
   <%= optionsProperty %>: I<%= otherEntityPascal %>[] = [];
   <% }); %>
 
