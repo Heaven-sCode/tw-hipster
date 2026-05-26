@@ -12,7 +12,7 @@ entity.fields.forEach(field => {
 
 const uniqueRelationshipImports = new Map();
 relationships.forEach(rel => {
-    if (!uniqueRelationshipImports.has(rel.otherEntityName)) {
+    if (rel.otherEntityName !== entity.name && !uniqueRelationshipImports.has(rel.otherEntityName)) {
         uniqueRelationshipImports.set(rel.otherEntityName, `import { I${rel.otherEntityName} } from '../${toKebabCase(rel.otherEntityName)}/${toKebabCase(rel.otherEntityName)}.model';`);
     }
 });

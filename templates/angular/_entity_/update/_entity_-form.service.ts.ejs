@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { I<%= entity.name %>, New<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
-
 <%
 function relationshipPropertyName(rel) {
   const isCollection = ['OneToMany', 'ManyToMany'].includes(rel.type);
@@ -11,7 +10,17 @@ function relationshipPropertyName(rel) {
   return isCollection ? toCamelCase(rel.otherEntityNamePlural) : toCamelCase(rel.otherEntityName);
 }
 const relationshipsForControls = relationships.filter(rel => rel.type !== 'OneToMany');
+const relationshipImports = new Map();
+relationshipsForControls.forEach(rel => {
+  if (rel.otherEntityName !== entity.name && !relationshipImports.has(rel.otherEntityName)) {
+    relationshipImports.set(
+      rel.otherEntityName,
+      `import { I${rel.otherEntityName} } from '../../${toKebabCase(rel.otherEntityName)}/${toKebabCase(rel.otherEntityName)}.model';`
+    );
+  }
+});
 %>
+<%- Array.from(relationshipImports.values()).join('\n') %>
 
 type <%= entity.name %>FormGroupInput = I<%= entity.name %> | Partial<New<%= entity.name %>>;
 type <%= entity.name %>FormRawValue = I<%= entity.name %>;
