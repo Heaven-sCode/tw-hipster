@@ -1,0 +1,10 @@
+<!-- Form Page component for <%= entity.name %> -->
+<div class="form-page-container p-6">
+  <h2 class="text-2xl font-bold mb-4">{{ isEdit ? 'Edit' : 'Create' }} <%= entity.name %></h2>
+  <app-<%= toKebabCase(entity.name) %>-form
+    [entity]="entity"
+    [heading]="isEdit ? 'Edit <%= entity.name %>' : 'New <%= entity.name %>'"
+    (saved)="onSaved($event)"
+    (cancelled)="onCancelled()"
+  ></app-<%= toKebabCase(entity.name) %>-form>
+</div>

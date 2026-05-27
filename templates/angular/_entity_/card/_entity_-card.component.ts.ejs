@@ -1,0 +1,31 @@
+import { Component, Input } from '@angular/core';
+import { Router } from '@angular/router';
+import { CommonModule, DatePipe } from '@angular/common';
+import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
+@Component({
+  selector: 'app-<%= toKebabCase(entity.name) %>-card',
+  templateUrl: './<%= toKebabCase(entity.name) %>-card.component.html',
+  styleUrls: ['./<%= toKebabCase(entity.name) %>-card.component.css'],
+  standalone: true,
+  imports: [CommonModule, DatePipe]   // add Angular Material modules if you use them, e.g. MatButtonModule
+})
+export class <%= entity.name %>CardComponent {
+  @Input() item!: I<%= entity.name %>;
+  @Input() searchTerm: string = '';
+  @Input() searchBy: string = '';
+  constructor(private router: Router) {}
+  openFormDrawer(mode: string): void {
+    // let the parent drawer handle the navigation – just emit an event if needed
+  }
+
+  highlightText(text: any, query: string): string {
+    if (!query || text === null || text === undefined) return text ? String(text) : '';
+    const textStr = String(text);
+    const regex = new RegExp(`(${this.escapeRegExp(query)})`, 'gi');
+    return textStr.replace(regex, '<span class="bg-yellow-100 font-semibold text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">$1</span>');
+  }
+
+  private escapeRegExp(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+}

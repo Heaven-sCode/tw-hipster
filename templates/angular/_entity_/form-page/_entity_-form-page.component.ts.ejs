@@ -1,0 +1,58 @@
+// Form Page Component TypeScript for <%= entity.name %>
+import { Component, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
+import { MatCardModule } from '@angular/material/card';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
+import { <%= entity.name %>Service } from '../service/<%= toKebabCase(entity.name) %>.service';
+import { <%= entity.name %>FormComponent } from '../form/<%= toKebabCase(entity.name) %>-form.component';
+
+@Component({
+  selector: 'app-<%= toKebabCase(entity.name) %>-form-page',
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatCardModule,
+    MatSnackBarModule,
+    <%= entity.name %>FormComponent
+  ],
+  templateUrl: './<%= toKebabCase(entity.name) %>-form-page.component.html'
+})
+export class <%= entity.name %>FormPageComponent {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly service = inject(<%= entity.name %>Service);
+  private readonly snackBar = inject(MatSnackBar);
+
+  isEdit = false;
+  entity: I<%= entity.name %> | null = null;
+
+  constructor() {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id) {
+      this.isEdit = true;
+      this.loadEntity(id);
+    }
+  }
+
+  private loadEntity(id: string): void {
+    this.service.find(Number(id)).subscribe({
+      next: (res) => {
+        if (res.body) {
+          this.entity = res.body;
+        }
+      },
+      error: () => this.snackBar.open('Failed to load <%= entity.name %>', 'Close', { duration: 3000 })
+    });
+  }
+
+  onSaved(savedEntity: I<%= entity.name %>): void {
+    this.snackBar.open('<%= entity.name %> saved successfully', 'Close', { duration: 2000 });
+    this.router.navigate([this.isEdit ? '../../' : '../'], { relativeTo: this.route });
+  }
+
+  onCancelled(): void {
+    this.router.navigate([this.isEdit ? '../../' : '../'], { relativeTo: this.route });
+  }
+}

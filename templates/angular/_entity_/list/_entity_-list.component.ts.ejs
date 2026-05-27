@@ -1,9 +1,10 @@
 // This is an EJS template. It generates the list component TypeScript file.
 import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { CdkScrollable } from '@angular/cdk/scrolling';
 import { merge, of, startWith, Subject, catchError, switchMap, tap, finalize } from 'rxjs';
 import dayjs from 'dayjs/esm';
 
@@ -29,6 +30,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
 import { <%= entity.name %>Service } from '../service/<%= toKebabCase(entity.name) %>.service';
 import { <%= entity.name %>FormComponent } from '../form/<%= toKebabCase(entity.name) %>-form.component';
+import { <%= entity.name %>CardComponent } from '../card/<%= toKebabCase(entity.name) %>-card.component';
 
 <%
 const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyToMany'].includes(rel.type));
@@ -154,6 +156,7 @@ const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = 
     CommonModule,
     ReactiveFormsModule,
     DragDropModule,
+    CdkScrollable,
     MatTableModule,
     MatSortModule,
     MatSidenavModule,
@@ -168,8 +171,9 @@ const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = 
     MatSelectModule,
     MatDatepickerModule,
     MatNativeDateModule,
-    MatSlideToggleModule,
+    MatSlideToggleModule, FormsModule,
     <%= entity.name %>FormComponent,
+    <%= entity.name %>CardComponent,
   ],
   templateUrl: './<%= toKebabCase(entity.name) %>-list.component.html',
 })
@@ -177,12 +181,14 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   // --- Injected Services ---
   private readonly <%= toCamelCase(entity.name) %>Service = inject(<%= entity.name %>Service);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly dialogRef = inject(MatDialogRef<<%= entity.name %>ListComponent>, { optional: true });
   private readonly dialogData = inject(MAT_DIALOG_DATA, { optional: true }) as ParentDialogData | null;
   private readonly fb = inject(FormBuilder);
 
   // --- State & Triggers ---
+  viewMode: 'table' | 'card' = 'table';
   isLoading = true;
   isExporting = false;
   totalItems = 0;
@@ -194,6 +200,14 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
 
   selected<%= entity.name %>: I<%= entity.name %> | null = null;
   drawerMode: 'new' | 'edit' = 'new';
+  // --- Search & Pin state ---
+  searchTerm: string = '';
+  searchBy: string = '';
+  searchableColumns: string[] = [<%- entity.fields.map(f => `'${f.fieldName}'`).join(', ') %>];
+  pinnedIds: Set<number> = new Set<number>();
+  readonly storageKeySearchTerm = '<%= toKebabCase(entity.name) %>-search-term';
+  readonly storageKeySearchBy = '<%= toKebabCase(entity.name) %>-search-by';
+  readonly storageKeyPinned = '<%= toKebabCase(entity.name) %>-pinned';
 
   <% entity.fields.forEach(field => { if (field.fieldTypeIsEnum) { %>
   readonly <%= toCamelCase(field.fieldType) %>Options = Object.keys(<%= field.fieldType %>);
@@ -259,7 +273,15 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   dataSource = new MatTableDataSource<I<%= entity.name %>>();
 
   ngOnInit(): void {
+    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+      this.viewMode = 'card';
+    }
     this.restoreColumnPreferences();
+    this.loadSearchState();
+    // Ensure pin column is always first
+    if (!this.displayedColumns.includes('pin')) {
+      this.displayedColumns.unshift('pin');
+    }
     if (this.dialogData?.parentFilters) {
       this.baseParentFilters = { ...this.dialogData.parentFilters };
     }
@@ -733,6 +755,99 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
       return JSON.stringify(value);
     }
     return String(value);
+  }
+
+  onSearchChange(): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.storageKeySearchTerm, this.searchTerm);
+      localStorage.setItem(this.storageKeySearchBy, this.searchBy);
+    }
+    this.applySearchFilter();
+  }
+
+  private applySearchFilter(): void {
+    // Clear previous search filters
+    this.searchableColumns.forEach(col => {
+      delete this.activeFilters[`${col}.contains`];
+      delete this.activeFilters[`${col}.equals`];
+    });
+
+    if (this.searchTerm && this.searchBy) {
+      const field = this.filterFields.find(f => f.key === this.searchBy);
+      if (field && field.valueType === 'string') {
+        this.activeFilters[`${this.searchBy}.contains`] = this.searchTerm;
+      } else {
+        this.activeFilters[`${this.searchBy}.equals`] = this.searchTerm;
+      }
+    }
+
+    if (this.paginator) {
+      this.paginator.firstPage();
+    }
+    this.refreshTrigger.next();
+    this.loadData();
+  }
+
+  togglePin(element: I<%= entity.name %>): void {
+    if (element.id === undefined) return;
+    if (this.pinnedIds.has(element.id)) {
+      this.pinnedIds.delete(element.id);
+    } else {
+      this.pinnedIds.add(element.id);
+    }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.storageKeyPinned, JSON.stringify(Array.from(this.pinnedIds)));
+    }
+  }
+
+  isPinned(id?: number): boolean {
+    return id !== undefined && this.pinnedIds.has(id);
+  }
+
+  getColumnLabel(key: string): string {
+    const col = this.allColumnPreferences.find(item => item.key === key);
+    return col ? col.label : key;
+  }
+
+  viewDetails(id: number): void {
+    this.router.navigate(['/admin/<%= toKebabCase(entity.name) %>', id, 'view']);
+  }
+
+  highlightText(text: any, query: string): string {
+    if (!query || text === null || text === undefined) return text ? String(text) : '';
+    const textStr = String(text);
+    const regex = new RegExp(`(${this.escapeRegExp(query)})`, 'gi');
+    return textStr.replace(regex, '<span class="bg-yellow-100 font-semibold text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">$1</span>');
+  }
+
+  private escapeRegExp(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  loadSearchState(): void {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+    this.searchTerm = localStorage.getItem(this.storageKeySearchTerm) ?? '';
+    this.searchBy = localStorage.getItem(this.storageKeySearchBy) ?? (this.searchableColumns[0] ?? '');
+    
+    try {
+      const pinned = localStorage.getItem(this.storageKeyPinned);
+      if (pinned) {
+        this.pinnedIds = new Set<number>(JSON.parse(pinned));
+      }
+    } catch {
+      this.pinnedIds = new Set<number>();
+    }
+
+    if (this.searchTerm && this.searchBy) {
+      const field = this.filterFields.find(f => f.key === this.searchBy);
+      if (field && field.valueType === 'string') {
+        this.activeFilters[`${this.searchBy}.contains`] = this.searchTerm;
+      } else {
+        this.activeFilters[`${this.searchBy}.equals`] = this.searchTerm;
+      }
+    }
   }
 
   private toCsvValue(value: string): string {

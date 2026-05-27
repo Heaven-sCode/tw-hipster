@@ -21,13 +21,18 @@ It takes the best part of JHipster—the powerful JDL for defining your data mod
 
 For each entity defined in your JDL, `tw-hipster` creates a complete set of files following modern Angular best practices:
 
-* **Standalone Components**: A list component with a data table, sorting, pagination, relationship-aware dialogs for children, and a side-drawer powered by a reusable form. No `ngModule` required.
+* **Standalone Components**: A list component with a Fuse-style content-scroll layout, a locked paginator, sorting, pagination, relationship-aware dialogs for children, and a side-drawer powered by a reusable form. No `ngModule` required.
+* **Dual List Presentation**: Each generated list supports both table and card views, with responsive card-first behavior on smaller screens.
 * **Reusable Form Components**: Each entity gets an `entity-form.component` that encapsulates the reactive form, handles create/update flows, and can be launched standalone or inside dialogs (perfect for nested relations).
+* **Standalone Form Pages**: In addition to the drawer form, each entity now gets a dedicated `entity-form-page.component` for full-page create and edit flows.
+* **Standalone Detail Pages**: Every entity now includes an `entity-detail.component` for route-based detail viewing.
+* **Entity Card Components**: Each entity gets an `entity-card.component` for compact summary rendering in card view.
 * **Typed Reactive Forms**: A dedicated form service (`entity-form.service.ts`) that creates a strongly-typed `FormGroup` for your entity, including relationship controls derived from your JDL.
 * **Advanced Filtering**: Every list view ships with a JPA meta-model aware filter drawer (equals, contains, ranges, specified, etc.) so your end users can slice data without touching the backend.
+* **Quick Search and Pinning**: Generated lists now include column-specific search, text highlighting, persistent search state, and row pinning stored in local storage.
 * **Data Services**: A clean service (`entity.service.ts`) for handling all HTTP operations (CRUD), with date handling and request options built-in.
 * **TypeScript Models**: Interfaces for your entities (`entity.model.ts`) and TypeScript enums (`enum.model.ts`).
-* **Routing**: A pre-configured routes file (`entity.routes.ts`) for easy integration into your application's router.
+* **Routing**: A pre-configured routes file (`entity.routes.ts`) for easy integration into your application's router, including list, detail, create, and edit routes.
 
 ---
 
@@ -84,6 +89,11 @@ After running the tool, you will have a new folder (e.g., `generated-app`) conta
       // ... other routes
     ];
     ```
+    Generated entity routes now include:
+    - `''` for the list view
+    - `':id/view'` for the detail page
+    - `':id/edit'` for the full-page edit form
+    - `'new'` for the full-page create form
 3.  **Install Dependencies**: Ensure your project has the required dependencies, such as Angular Material and Day.js.
 
 ---

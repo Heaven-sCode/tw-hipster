@@ -109,7 +109,7 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
   <mat-drawer-content class="flex flex-col">
     <div class="absolute inset-0 flex min-w-0 flex-col overflow-hidden">
 
-      <!-- Header -->
+      <!-- Header (fixed, does not scroll) -->
       <div class="bg-default dark:bg-transparent flex flex-0 flex-col p-6 pb-22 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:pb-28 sm:pt-12">
         <div class="min-w-0 flex-1">
           <h2 class="truncate text-3xl font-extrabold leading-7 tracking-tight sm:leading-10 md:text-4xl">
@@ -118,95 +118,151 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
         </div>
         <!-- Actions -->
         <div class="mt-6 flex shrink-0 items-center gap-3 sm:ml-4 sm:mt-0">
-          <button *ngIf="filterFields.length" mat-stroked-button type="button" (click)="openFilterDrawer()">
+          
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-40">
+              <mat-select [(ngModel)]="searchBy" (ngModelChange)="onSearchChange()">
+                <mat-option *ngFor="let col of searchableColumns" [value]="col">
+                  {{ getColumnLabel(col) }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-64">
+              <mat-icon matPrefix svgIcon="search" class="text-neutral-500 mr-2"></mat-icon>
+              <input matInput placeholder="Search…" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()" />
+            </mat-form-field>
+
+          <div class="search-bar flex items-center gap-3">
+            <button *ngIf="filterFields.length" mat-stroked-button type="button" (click)="openFilterDrawer()">
             <mat-icon svgIcon="search"></mat-icon>
-            <span class="ml-2">Filters</span>
-          </button>
-          <button mat-stroked-button type="button" [matMenuTriggerFor]="columnPreferenceMenu">
-            <mat-icon svgIcon="menu"></mat-icon>
-            <span class="ml-2">Columns</span>
-          </button>
-          <button mat-flat-button color="primary" type="button" (click)="openFormDrawer()">
-            <mat-icon svgIcon="plus"></mat-icon>
-            <span class="ml-2">New <%= entity.name %></span>
-          </button>
+             <!-- <span class="ml-2">Filters</span> -->
+           </button>
+            <button mat-stroked-button type="button" [matMenuTriggerFor]="columnPreferenceMenu">
+              <mat-icon svgIcon="menu"></mat-icon>
+              <!-- <span class="ml-2">Columns</span> -->
+            </button>
+           <button mat-stroked-button type="button" (click)="viewMode = (viewMode === 'table' ? 'card' : 'table')" [matTooltip]="viewMode === 'table' ? 'Switch to Card View' : 'Switch to Table View'">
+             @if (viewMode === 'table') {
+               <mat-icon svgIcon="credit-card"></mat-icon>
+             } @else {
+               <mat-icon svgIcon="table"></mat-icon>
+             }
+           </button>
+
+            <button mat-flat-button color="primary" type="button" (click)="openFormDrawer()">
+              <mat-icon svgIcon="plus"></mat-icon>
+              <span class="ml-2">New <%= entity.name %></span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Table Container -->
-      <div class="example-table-container bg-card -mt-16 flex-1 min-h-0 rounded-t-2xl" style="overflow-x: auto; white-space: nowrap; width: 100%">
-        <div *ngIf="isLoading" class="flex items-center justify-center p-8">
-          <mat-progress-spinner [diameter]="40" [mode]="'indeterminate'"></mat-progress-spinner>
-        </div>
+      <!-- Main -->
+      <div
+        class="bg-card -mt-16 flex-auto overflow-y-auto rounded-t-2xl p-6 shadow sm:p-10"
+        cdkScrollable
+      >
+          <!-- Table View -->
+          @if (viewMode === 'table') {
+            <div *ngIf="isLoading" class="flex items-center justify-center p-8">
+              <mat-progress-spinner [diameter]="40" [mode]="'indeterminate'"></mat-progress-spinner>
+            </div>
 
-        <table
-          mat-table
-          [dataSource]="dataSource"
-          matSort
-          (matSortChange)="loadData()"
-          cdkDropList
-          cdkDropListOrientation="horizontal"
-          [cdkDropListData]="displayedColumns"
-          (cdkDropListDropped)="drop($event)"
-          *ngIf="!isLoading"
-        >
+            <div class="-m-6 overflow-x-auto sm:-m-10" *ngIf="!isLoading">
+              <table
+                mat-table
+                [dataSource]="dataSource"
+                matSort
+                (matSortChange)="loadData()"
+                cdkDropList
+                cdkDropListOrientation="horizontal"
+                [cdkDropListData]="displayedColumns"
+                (cdkDropListDropped)="drop($event)"
+                class="min-w-full"
+              >
 
-          <!-- Dynamically generate columns for entity fields -->
-          <ng-container matColumnDef="id">
-            <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header>ID</th>
-            <td mat-cell *matCellDef="let element">{{ element.id }}</td>
-          </ng-container>
-          <% entity.fields.forEach(field => { %>
-          <ng-container matColumnDef="<%= field.fieldName %>">
-            <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header><%= toPascalCase(field.fieldName) %></th>
-            <% if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>
-            <td mat-cell *matCellDef="let element">{{ element.<%= field.fieldName %> | date: 'medium' }}</td>
-            <% } else { %>
-            <td mat-cell *matCellDef="let element">{{ element.<%= field.fieldName %> }}</td>
-            <% } %>
-          </ng-container>
-          <% }); %>
+              <!-- Dynamically generate columns for entity fields -->
+              <ng-container matColumnDef="id">
+                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header>ID</th>
+                <td mat-cell *matCellDef="let element">{{ element.id }}</td>
+              </ng-container>
+              <ng-container matColumnDef="pin">
+                <th mat-header-cell *matHeaderCellDef></th>
+                <td mat-cell *matCellDef="let element">
+                  <button mat-icon-button (click)="togglePin(element)" [color]="isPinned(element.id) ? 'primary' : undefined">
+                    <mat-icon svgIcon="push_pin"></mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+              <% entity.fields.forEach(field => { %>
+              <ng-container matColumnDef="<%= field.fieldName %>">
+                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header><%= toPascalCase(field.fieldName) %></th>
+                <% if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>
+                <td mat-cell *matCellDef="let element">{{ element.<%= field.fieldName %>?.toDate() | date: 'medium' }}</td>
+                <% } else { %>
+                <td mat-cell *matCellDef="let element" [innerHTML]="highlightText(element.<%= field.fieldName %>, searchBy === '<%= field.fieldName %>' ? searchTerm : '')"></td>
+                <% } %>
+              </ng-container>
+              <% }); %>
 
-          <!-- Generate columns for "Show Children" buttons -->
-          <% collectionRelationships.forEach(rel => { %>
-          <ng-container matColumnDef="actions-<%= rel.otherEntityName %>">
-            <th mat-header-cell cdkDrag *matHeaderCellDef> <%= rel.otherEntityNamePascalCase %> </th>
-            <td mat-cell *matCellDef="let element">
-              <button mat-icon-button (click)="show<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Show <%= rel.otherEntityNamePascalCase %>">
-                <mat-icon svgIcon="file"></mat-icon>
-              </button>
-              <button mat-icon-button class="ml-2" (click)="add<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Add <%= rel.otherEntityNamePascalCase %>">
-                <mat-icon svgIcon="plus"></mat-icon>
-              </button>
-            </td>
-          </ng-container>
-          <% }); %>
+              <!-- Generate columns for "Show Children" buttons -->
+              <% collectionRelationships.forEach(rel => { %>
+              <ng-container matColumnDef="actions-<%= rel.otherEntityName %>">
+                <th mat-header-cell cdkDrag *matHeaderCellDef> <%= rel.otherEntityNamePascalCase %> </th>
+                <td mat-cell *matCellDef="let element">
+                  <button mat-icon-button (click)="show<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Show <%= rel.otherEntityNamePascalCase %>">
+                    <mat-icon svgIcon="file"></mat-icon>
+                  </button>
+                  <button mat-icon-button class="ml-2" (click)="add<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Add <%= rel.otherEntityNamePascalCase %>">
+                    <mat-icon svgIcon="plus"></mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+              <% }); %>
 
-          <!-- General Actions Column (Edit/Delete) -->
-          <ng-container matColumnDef="actions">
-            <th mat-header-cell cdkDrag *matHeaderCellDef>Actions</th>
-            <td mat-cell *matCellDef="let element">
-              <button mat-icon-button (click)="openFormDrawer(element.id)" matTooltip="Edit <%= entity.name %>">
-                <mat-icon svgIcon="square-pen"></mat-icon>
-              </button>
-              <button mat-icon-button (click)="delete(element.id)" matTooltip="Delete <%= entity.name %>">
-                <mat-icon class="text-warn" svgIcon="trash"></mat-icon>
-              </button>
-            </td>
-          </ng-container>
+              <!-- General Actions Column (Edit/Delete) -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell cdkDrag *matHeaderCellDef>Actions</th>
+                <td mat-cell *matCellDef="let element">
+                  <button mat-icon-button (click)="viewDetails(element.id)" matTooltip="View Details">
+                    <mat-icon svgIcon="eye"></mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="openFormDrawer(element.id)" matTooltip="Edit <%= entity.name %>">
+                    <mat-icon svgIcon="square-pen"></mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="delete(element.id)" matTooltip="Delete <%= entity.name %>">
+                    <mat-icon class="text-warn" svgIcon="trash"></mat-icon>
+                  </button>
+                </td>
+              </ng-container>
 
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
-          <tr class="mat-row" *matNoDataRow>
-            <td class="mat-cell" [attr.colspan]="displayedColumns.length">No data found.</td>
-          </tr>
-        </table>
+                <tr class="mat-row" *matNoDataRow>
+                  <td class="mat-cell" [attr.colspan]="displayedColumns.length">No data found.</td>
+                </tr>
+              </table>
+            </div>
+          }
+
+          <!-- Card View -->
+          @if (viewMode === 'card') {
+            <div *ngIf="isLoading" class="flex items-center justify-center p-8">
+              <mat-progress-spinner [diameter]="40" [mode]="'indeterminate'"></mat-progress-spinner>
+            </div>
+            <div *ngIf="!isLoading" class="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              <app-<%= toKebabCase(entity.name) %>-card *ngFor="let element of dataSource.data" [item]="element" [searchTerm]="searchTerm" [searchBy]="searchBy" class="block"></app-<%= toKebabCase(entity.name) %>-card>
+            </div>
+            <div *ngIf="!isLoading && !dataSource.data.length" class="p-8 text-center text-neutral-500">
+              No data found.
+            </div>
+          }
       </div>
 
-      <!-- Paginator -->
+      <!-- Paginator (locked at bottom, never scrolls) -->
       <mat-paginator
-        class="mt-auto shrink-0 border-t border-neutral-200 bg-card [&_.mat-mdc-paginator-container]:justify-start"
+        class="flex-0 shrink-0 border-t border-neutral-200 bg-card [&_.mat-mdc-paginator-container]:justify-start"
         [length]="totalItems"
         [pageSize]="itemsPerPage"
         [pageSizeOptions]="[10, 25, 50, 100]"

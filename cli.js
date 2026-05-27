@@ -364,6 +364,18 @@ async function generateEntityFiles(config, entity, allRelationships) {
         { template: '_entity_.routes.ts.ejs',      subfolder: '',       outputPattern: '<%= entityName %>.routes.ts' },
         { template: '_entity_.service.ts.ejs',     subfolder: 'service',outputPattern: '<%= entityName %>.service.ts' },
         { template: '_entity_-form.service.ts.ejs',subfolder: 'update', outputPattern: '<%= entityName %>-form.service.ts' },
+        // Form page component (standalone)
+        { template: '_entity_-form-page.component.ts.ejs', subfolder: 'form-page', outputPattern: '<%= entityName %>-form-page.component.ts' },
+        { template: '_entity_-form-page.component.html.ejs', subfolder: 'form-page', outputPattern: '<%= entityName %>-form-page.component.html' },
+        // Detail component (drawer view)
+        { template: '_entity_-detail.component.ts.ejs', subfolder: 'detail', outputPattern: '<%= entityName %>-detail.component.ts' },
+        { template: '_entity_-detail.component.html.ejs', subfolder: 'detail', outputPattern: '<%= entityName %>-detail.component.html' },
+        { template: '_entity_-detail.component.css.ejs', subfolder: 'detail', outputPattern: '<%= entityName %>-detail.component.css' },
+        // Card component (summary tile)
+        { template: '_entity_-card.component.ts.ejs', subfolder: 'card', outputPattern: '<%= entityName %>-card.component.ts' },
+        { template: '_entity_-card.component.html.ejs', subfolder: 'card', outputPattern: '<%= entityName %>-card.component.html' },
+        { template: '_entity_-card.component.css.ejs', subfolder: 'card', outputPattern: '<%= entityName %>-card.component.css' },
+        // Existing drawer form component
         { template: '_entity_-form.component.ts.ejs', subfolder: 'form', outputPattern: '<%= entityName %>-form.component.ts' },
         { template: '_entity_-form.component.html.ejs', subfolder: 'form', outputPattern: '<%= entityName %>-form.component.html' },
         { template: '_entity_-list.component.ts.ejs', subfolder: 'list',   outputPattern: '<%= entityName %>-list.component.ts' },

@@ -1,0 +1,39 @@
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
+import { <%= entity.name %>Service } from '../service/<%= toKebabCase(entity.name) %>.service';
+
+@Component({
+  selector: 'app-<%= toKebabCase(entity.name) %>-detail',
+  templateUrl: './<%= toKebabCase(entity.name) %>-detail.component.html',
+  styleUrls: ['./<%= toKebabCase(entity.name) %>-detail.component.css'],
+  standalone: true,
+  imports: [CommonModule]
+})
+export class <%= entity.name %>DetailComponent implements OnInit {
+  element!: I<%= entity.name %>;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private service: <%= entity.name %>Service
+  ) {}
+
+  ngOnInit(): void {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id) {
+      this.service.find(Number(id)).subscribe({
+        next: (res) => {
+          if (res.body) {
+            this.element = res.body;
+          }
+        }
+      });
+    }
+  }
+
+  goBack(): void {
+    this.router.navigate(['../'], { relativeTo: this.route });
+  }
+}
