@@ -1,6 +1,6 @@
 {
   "name": "tw-hipster",
-  "version": "1.2.2",
+  "version": "2.4.51",
   "description": "A JDL-to-Angular code generator. based on tailwind + angular material",
   "main": "cli.js",
   "bin": {
@@ -25,5 +25,10 @@
   "bugs": {
     "url": "https://github.com/Heaven-sCode/fhipster/issues"
   },
-  "homepage": "https://github.com/Heaven-sCode/fhipster/wiki"
+  "homepage": "https://github.com/Heaven-sCode/fhipster/wiki",
+
+  "author": "Viroj Fernando fernandoviroj@gmail.com",
+  "contributors": [
+    "Fayyaz Abdulla abdx2228@gmail.com"
+  ]
 }
