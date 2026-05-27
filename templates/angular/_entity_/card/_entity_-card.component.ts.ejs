@@ -1,18 +1,22 @@
 import { Component, Input } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, DatePipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
 @Component({
   selector: 'app-<%= toKebabCase(entity.name) %>-card',
   templateUrl: './<%= toKebabCase(entity.name) %>-card.component.html',
   styleUrls: ['./<%= toKebabCase(entity.name) %>-card.component.css'],
   standalone: true,
-  imports: [CommonModule, DatePipe]   // add Angular Material modules if you use them, e.g. MatButtonModule
+  imports: [CommonModule, DatePipe, MatButtonModule, MatIconModule]
 })
 export class <%= entity.name %>CardComponent {
   @Input() item!: I<%= entity.name %>;
   @Input() searchTerm: string = '';
   @Input() searchBy: string = '';
+  @Input() pinned = false;
+  @Input() flagClass = 'text-neutral-300';
   constructor(private router: Router) {}
   openFormDrawer(mode: string): void {
     // let the parent drawer handle the navigation – just emit an event if needed

@@ -117,6 +117,12 @@ interface FilterChip {
   colorClass: string;
 }
 
+interface RowFlagOption {
+  key: string;
+  label: string;
+  iconClass: string;
+}
+
 const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = {
   string: [
     { key: 'contains', label: 'Contains', requiresValue: true, valueType: 'string' },
@@ -205,9 +211,20 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   searchBy: string = '';
   searchableColumns: string[] = [<%- entity.fields.map(f => `'${f.fieldName}'`).join(', ') %>];
   pinnedIds: Set<number> = new Set<number>();
+  activeFlagRowId: number | null = null;
+  rowFlagColors: Record<number, string> = {};
   readonly storageKeySearchTerm = '<%= toKebabCase(entity.name) %>-search-term';
   readonly storageKeySearchBy = '<%= toKebabCase(entity.name) %>-search-by';
   readonly storageKeyPinned = '<%= toKebabCase(entity.name) %>-pinned';
+  readonly storageKeyFlags = '<%= toKebabCase(entity.name) %>-flags';
+  readonly rowFlagOptions: RowFlagOption[] = [
+    { key: 'slate', label: 'Slate', iconClass: 'text-slate-400' },
+    { key: 'blue', label: 'Blue', iconClass: 'text-blue-500' },
+    { key: 'emerald', label: 'Green', iconClass: 'text-emerald-500' },
+    { key: 'amber', label: 'Amber', iconClass: 'text-amber-400' },
+    { key: 'rose', label: 'Rose', iconClass: 'text-rose-500' },
+    { key: 'violet', label: 'Violet', iconClass: 'text-violet-500' },
+  ];
 
   <% entity.fields.forEach(field => { if (field.fieldTypeIsEnum) { %>
   readonly <%= toCamelCase(field.fieldType) %>Options = Object.keys(<%= field.fieldType %>);
@@ -262,6 +279,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   @ViewChild(MatSort) sort!: MatSort;
 
   readonly allColumnPreferences: TableColumnPreference[] = [
+    { key: 'state', label: 'State', alwaysVisible: true },
     { key: 'id', label: 'ID', alwaysVisible: true },
     <% entity.fields.forEach(field => { %>{ key: '<%= field.fieldName %>', label: '<%= toPascalCase(field.fieldName) %>' },
     <% }); %>
@@ -278,10 +296,6 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     }
     this.restoreColumnPreferences();
     this.loadSearchState();
-    // Ensure pin column is always first
-    if (!this.displayedColumns.includes('pin')) {
-      this.displayedColumns.unshift('pin');
-    }
     if (this.dialogData?.parentFilters) {
       this.baseParentFilters = { ...this.dialogData.parentFilters };
     }
@@ -329,7 +343,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
       tap(res => {
         this.isLoading = false;
         this.totalItems = Number(res.headers.get('X-Total-Count') ?? 0);
-        this.dataSource.data = res.body ?? [];
+        this.dataSource.data = this.sortRowsForDisplay(res.body ?? []);
       }),
       catchError(() => {
         this.isLoading = false;
@@ -719,7 +733,10 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
 
   private downloadCsv(rows: I<%= entity.name %>[]): void {
     const exportableColumns = this.allColumnPreferences.filter(
-      item => this.displayedColumns.includes(item.key) && !item.key.startsWith('actions')
+      item =>
+        this.displayedColumns.includes(item.key) &&
+        !item.key.startsWith('actions') &&
+        item.key !== 'state'
     );
     const header = exportableColumns.map(item => item.label);
     const dataRows = rows.map(row =>
@@ -798,10 +815,47 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(this.storageKeyPinned, JSON.stringify(Array.from(this.pinnedIds)));
     }
+    this.dataSource.data = this.sortRowsForDisplay([...this.dataSource.data]);
   }
 
   isPinned(id?: number): boolean {
     return id !== undefined && this.pinnedIds.has(id);
+  }
+
+  setFlagMenuRow(element: I<%= entity.name %>): void {
+    this.activeFlagRowId = element.id ?? null;
+  }
+
+  setFlagColor(colorKey: string | null): void {
+    if (this.activeFlagRowId === null) {
+      return;
+    }
+
+    if (colorKey) {
+      this.rowFlagColors[this.activeFlagRowId] = colorKey;
+    } else {
+      delete this.rowFlagColors[this.activeFlagRowId];
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.storageKeyFlags, JSON.stringify(this.rowFlagColors));
+    }
+    this.activeFlagRowId = null;
+  }
+
+  getFlagColor(id?: number): string | null {
+    if (id === undefined) {
+      return null;
+    }
+    return this.rowFlagColors[id] ?? null;
+  }
+
+  getFlagClass(id?: number): string {
+    const colorKey = this.getFlagColor(id);
+    if (!colorKey) {
+      return 'text-neutral-300';
+    }
+    return this.rowFlagOptions.find(option => option.key === colorKey)?.iconClass ?? 'text-neutral-300';
   }
 
   getColumnLabel(key: string): string {
@@ -840,6 +894,16 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
       this.pinnedIds = new Set<number>();
     }
 
+    try {
+      const flags = localStorage.getItem(this.storageKeyFlags);
+      if (flags) {
+        const parsed = JSON.parse(flags);
+        this.rowFlagColors = parsed && typeof parsed === 'object' ? parsed : {};
+      }
+    } catch {
+      this.rowFlagColors = {};
+    }
+
     if (this.searchTerm && this.searchBy) {
       const field = this.filterFields.find(f => f.key === this.searchBy);
       if (field && field.valueType === 'string') {
@@ -848,6 +912,17 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
         this.activeFilters[`${this.searchBy}.equals`] = this.searchTerm;
       }
     }
+  }
+
+  private sortRowsForDisplay(rows: I<%= entity.name %>[]): I<%= entity.name %>[] {
+    return [...rows].sort((left, right) => {
+      const leftPinned = this.isPinned(left.id);
+      const rightPinned = this.isPinned(right.id);
+      if (leftPinned === rightPinned) {
+        return 0;
+      }
+      return leftPinned ? -1 : 1;
+    });
   }
 
   private toCsvValue(value: string): string {
