@@ -120,7 +120,7 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
         <div class="mt-6 flex shrink-0 items-center gap-3 sm:ml-4 sm:mt-0">
           
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-40">
-              <mat-select [(ngModel)]="searchBy" (ngModelChange)="onSearchChange()">
+            <mat-select [(ngModel)]="searchBy" (ngModelChange)="onSearchChange()">
                 <mat-option *ngFor="let col of searchableColumns" [value]="col">
                   {{ getColumnLabel(col) }}
                 </mat-option>

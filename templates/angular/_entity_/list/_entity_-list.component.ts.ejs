@@ -786,16 +786,10 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     // Clear previous search filters
     this.searchableColumns.forEach(col => {
       delete this.activeFilters[`${col}.contains`];
-      delete this.activeFilters[`${col}.equals`];
     });
 
     if (this.searchTerm && this.searchBy) {
-      const field = this.filterFields.find(f => f.key === this.searchBy);
-      if (field && field.valueType === 'string') {
-        this.activeFilters[`${this.searchBy}.contains`] = this.searchTerm;
-      } else {
-        this.activeFilters[`${this.searchBy}.equals`] = this.searchTerm;
-      }
+      this.activeFilters[`${this.searchBy}.contains`] = this.searchTerm;
     }
 
     if (this.paginator) {
@@ -905,12 +899,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     }
 
     if (this.searchTerm && this.searchBy) {
-      const field = this.filterFields.find(f => f.key === this.searchBy);
-      if (field && field.valueType === 'string') {
-        this.activeFilters[`${this.searchBy}.contains`] = this.searchTerm;
-      } else {
-        this.activeFilters[`${this.searchBy}.equals`] = this.searchTerm;
-      }
+      this.activeFilters[`${this.searchBy}.contains`] = this.searchTerm;
     }
   }
 
