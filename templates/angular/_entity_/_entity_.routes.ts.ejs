@@ -1,11 +1,16 @@
 import { Routes } from '@angular/router';
 import { <%= entity.name %>ListComponent } from './list/<%= toKebabCase(entity.name) %>-list.component';
+import { <%= entity.name %>DetailComponent } from './detail/<%= toKebabCase(entity.name) %>-detail.component';
+import { <%= entity.name %>FormPageComponent } from './form-page/<%= toKebabCase(entity.name) %>-form-page.component';
 
 export default [
   {
     path: '',
     component: <%= entity.name %>ListComponent,
   },
+  { path: ':id/view', component: <%= entity.name %>DetailComponent },
+  { path: ':id/edit', component: <%= entity.name %>FormPageComponent },
+  { path: 'new', component: <%= entity.name %>FormPageComponent },
   <% relationships.forEach(rel => { %>
   // Route to show children of this entity
   // e.g., /customers/:customerId/orders

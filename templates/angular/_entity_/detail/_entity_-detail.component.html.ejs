@@ -1,0 +1,17 @@
+<!-- Detail component for <%= entity.name %> -->
+<div class="detail-page p-6 sm:p-10">
+  <div class="detail-container">
+    <div class="detail-header">
+      <h2 class="text-2xl font-bold tracking-tight sm:text-3xl"><%= entity.name %> Details</h2>
+    </div>
+
+    <div class="detail-grid">
+      <% entity.fields.forEach(function(field){ %>
+        <div class="field-block">
+          <strong class="field-label"><%= toPascalCase(field.fieldName) %></strong>
+          <span class="field-value">{{ element?.<%= field.fieldName %> }}</span>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</div>

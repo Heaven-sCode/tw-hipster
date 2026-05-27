@@ -1,0 +1,24 @@
+<div class="card {{item?.id}}-card">
+  <div class="card-status">
+    <mat-icon svgIcon="flag" class="card-flag" [ngClass]="flagClass"></mat-icon>
+    <span *ngIf="pinned" class="card-pin">
+      <mat-icon svgIcon="heroicons_mini:paper-clip" class="text-red-500"></mat-icon>
+      <span>Pinned</span>
+    </span>
+  </div>
+  <h3 class="card-title">{{item?.id}}</h3>
+  <p class="card-body">
+    <!-- Add the fields you want to show on the card -->
+    <% entity.fields.forEach(function (field) { %>
+      <strong><%= toPascalCase(field.fieldName) %>:</strong> 
+      <% if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>
+        {{item?.<%= field.fieldName %>?.toDate() | date}}<br/>
+      <% } else { %>
+        <span [innerHTML]="highlightText(item?.<%= field.fieldName %>, searchBy === '<%= field.fieldName %>' ? searchTerm : '')"></span><br/>
+      <% } %>
+    <% }) %>
+  </p>
+  <button mat-button color="primary" (click)="openFormDrawer('edit')">
+    Edit
+  </button>
+</div>
