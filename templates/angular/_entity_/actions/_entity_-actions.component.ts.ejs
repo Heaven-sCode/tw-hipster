@@ -42,8 +42,12 @@ export class <%= entity.name %>ActionsComponent {
   @Output() viewModeChange = new EventEmitter<'table' | 'card'>();
   @Output() newClick = new EventEmitter<void>();
 
-  onSearchChange(): void {
-    this.searchChange.emit({ searchBy: this.searchBy, searchTerm: this.searchTerm });
+  onSearchByChange(value: string): void {
+    this.searchChange.emit({ searchBy: value, searchTerm: this.searchTerm });
+  }
+
+  onSearchTermChange(value: string): void {
+    this.searchChange.emit({ searchBy: this.searchBy, searchTerm: value });
   }
 
   toggleViewMode(): void {
