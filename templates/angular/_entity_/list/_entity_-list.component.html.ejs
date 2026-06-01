@@ -110,16 +110,16 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
     <div class="absolute inset-0 flex min-w-0 flex-col overflow-hidden">
 
       <!-- Header (fixed, does not scroll) -->
-      <div class="bg-default dark:bg-transparent flex flex-0 flex-col p-6 pb-22 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:pb-28 sm:pt-12">
+      <div class="bg-default dark:bg-transparent flex flex-0 flex-col p-6 pb-22 lg:flex-row lg:items-center lg:justify-between lg:px-10 lg:pb-28 lg:pt-12">
         <div class="min-w-0 flex-1">
           <h2 class="truncate text-3xl font-extrabold leading-7 tracking-tight sm:leading-10 md:text-4xl">
             <%= entity.name %> Management
           </h2>
         </div>
         <!-- Actions -->
-        <div class="mt-6 flex shrink-0 items-center gap-3 sm:ml-4 sm:mt-0">
+        <div class="mt-6 grid grid-cols-2 gap-3 w-full lg:ml-4 lg:mt-0 lg:flex lg:w-auto lg:shrink-0 lg:items-center">
           
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-40">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full lg:w-40">
             <mat-select [(ngModel)]="searchBy" (ngModelChange)="onSearchChange()">
                 <mat-option *ngFor="let col of searchableColumns" [value]="col">
                   {{ getColumnLabel(col) }}
@@ -127,12 +127,12 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
               </mat-select>
             </mat-form-field>
 
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-64">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full lg:w-64">
               <mat-icon matPrefix svgIcon="search" class="text-neutral-500 mr-2"></mat-icon>
               <input matInput placeholder="Search…" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()" />
             </mat-form-field>
 
-          <div class="search-bar flex items-center gap-3">
+          <div class="search-bar col-span-2 flex items-center gap-3 justify-between lg:justify-start">
             <button *ngIf="filterFields.length" mat-stroked-button type="button" (click)="openFilterDrawer()">
             <mat-icon svgIcon="search"></mat-icon>
              <!-- <span class="ml-2">Filters</span> -->
