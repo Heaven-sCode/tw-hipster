@@ -1,0 +1,43 @@
+<div class="mt-6 grid grid-cols-2 gap-3 w-full xl:ml-4 xl:mt-0 xl:flex xl:w-auto xl:shrink-0 xl:items-center">
+  
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full xl:w-40">
+    <mat-select [(ngModel)]="searchBy" (ngModelChange)="onSearchChange()">
+        <mat-option *ngFor="let col of searchableColumns" [value]="col">
+          {{ getColumnLabel(col) }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full xl:w-64">
+      <mat-icon matPrefix svgIcon="search" class="text-neutral-500 mr-2"></mat-icon>
+      <input matInput placeholder="Search…" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()" />
+    </mat-form-field>
+
+  <div class="search-bar col-span-2 flex items-center gap-3 justify-between xl:justify-start">
+    
+    <button mat-stroked-button type="button" [matMenuTriggerFor]="columnMenu" class="w-12 h-10 min-w-0 p-0">
+      <span class="flex items-center justify-center">
+        <mat-icon svgIcon="menu" class="m-0"></mat-icon>
+      </span>
+    </button>
+    <button mat-stroked-button type="button" (click)="toggleViewMode()" [matTooltip]="viewMode === 'table' ? 'Switch to Card View' : 'Switch to Table View'" class="w-12 h-10 min-w-0 p-0">
+      <span class="flex items-center justify-center">
+        @if (viewMode === 'table') {
+          <mat-icon svgIcon="credit-card" class="m-0"></mat-icon>
+        } @else {
+          <mat-icon svgIcon="table" class="m-0"></mat-icon>
+        }
+      </span>
+    </button>
+<button *ngIf="filterFieldsLength" mat-stroked-button type="button" class="w-12 h-10 min-w-0 p-0" (click)="filterClick.emit()">
+      <span class="flex items-center justify-center">
+         <mat-icon svgIcon="funnel" class="m-0"></mat-icon>
+      </span>
+    </button>
+    <button mat-flat-button color="primary" type="button" (click)="newClick.emit()">
+      <mat-icon svgIcon="plus"></mat-icon>
+      <!-- <span class="ml-2">New <%= entity.name %></span> -->
+      <span class="ml-2">New</span>
+    </button>
+  </div>
+</div>

@@ -32,6 +32,7 @@ import { <%= entity.name %>Service } from '../service/<%= toKebabCase(entity.nam
 import { <%= entity.name %>FormComponent } from '../form/<%= toKebabCase(entity.name) %>-form.component';
 import { <%= entity.name %>CardComponent } from '../card/<%= toKebabCase(entity.name) %>-card.component';
 import { <%= entity.name %>FilterComponent } from '../filter/<%= toKebabCase(entity.name) %>-filter.component';
+import { <%= entity.name %>ActionsComponent } from '../actions/<%= toKebabCase(entity.name) %>-actions.component';
 
 <%
 const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyToMany'].includes(rel.type));
@@ -182,8 +183,12 @@ const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = 
     <%= entity.name %>FormComponent,
     <%= entity.name %>CardComponent,
     <%= entity.name %>FilterComponent,
+    <%= entity.name %>ActionsComponent,
   ],
   templateUrl: './<%= toKebabCase(entity.name) %>-list.component.html',
+  host: {
+    class: 'relative flex flex-col flex-auto min-h-0 w-full',
+  },
 })
 export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   // --- Injected Services ---
@@ -202,7 +207,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   itemsPerPage = 10;
   private readonly refreshTrigger = new Subject<void>();
   private baseParentFilters: Record<string, string | number> = {};
-  private activeFilters: Record<string, string> = {};
+  protected activeFilters: Record<string, string> = {};
   private readonly columnPreferenceStorageKey = '<%= toKebabCase(entity.name) %>-list-column-preferences';
 
   selected<%= entity.name %>: I<%= entity.name %> | null = null;
@@ -598,15 +603,15 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     return String(value);
   }
 
-  onSearchChange(): void {
+  handleSearchChanged(event: { searchBy: string; searchTerm: string }): void {
+    this.searchBy = event.searchBy;
+    this.searchTerm = event.searchTerm;
+
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(this.storageKeySearchTerm, this.searchTerm);
       localStorage.setItem(this.storageKeySearchBy, this.searchBy);
     }
-    this.applySearchFilter();
-  }
 
-  private applySearchFilter(): void {
     // Clear previous search filters
     this.searchableColumns.forEach(col => {
       delete this.activeFilters[`${col}.contains`];

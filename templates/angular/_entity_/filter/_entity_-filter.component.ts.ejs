@@ -95,6 +95,9 @@ const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = 
 @Component({
   selector: 'app-<%= toKebabCase(entity.name) %>-filter',
   templateUrl: './<%= toKebabCase(entity.name) %>-filter.component.html',
+  host: {
+    class: 'flex flex-col h-full w-full',
+  },
   standalone: true,
   imports: [
     CommonModule,
