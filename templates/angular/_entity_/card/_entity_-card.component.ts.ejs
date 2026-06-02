@@ -1,9 +1,11 @@
-import { Component, Input } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, Input, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
+import { <%= entity.name %>Service } from '../service/<%= toKebabCase(entity.name) %>.service';
+
 @Component({
   selector: 'app-<%= toKebabCase(entity.name) %>-card',
   templateUrl: './<%= toKebabCase(entity.name) %>-card.component.html',
@@ -11,15 +13,43 @@ import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
   standalone: true,
   imports: [CommonModule, DatePipe, MatButtonModule, MatIconModule]
 })
-export class <%= entity.name %>CardComponent {
-  @Input() item!: I<%= entity.name %>;
+export class <%= entity.name %>CardComponent implements OnInit {
+  @Input() item?: I<%= entity.name %>;
   @Input() searchTerm: string = '';
   @Input() searchBy: string = '';
   @Input() pinned = false;
   @Input() flagClass = 'text-neutral-300';
-  constructor(private router: Router) {}
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private service: <%= entity.name %>Service
+  ) {}
+
+  ngOnInit(): void {
+    if (!this.item) {
+      const id = this.route.snapshot.paramMap.get('id');
+      if (id) {
+        this.service.find(Number(id)).subscribe({
+          next: (res) => {
+            if (res.body) {
+              this.item = res.body;
+            }
+          }
+        });
+      }
+    }
+  }
+
   openFormDrawer(mode: string): void {
-    // let the parent drawer handle the navigation – just emit an event if needed
+    if (this.item && this.item.id) {
+      const url = this.router.url;
+      if (url.endsWith('/card') || url.includes('/' + this.item.id + '/card')) {
+        this.router.navigate(['../edit'], { relativeTo: this.route });
+      } else {
+        this.router.navigate([this.item.id, 'edit'], { relativeTo: this.route });
+      }
+    }
   }
 
   highlightText(text: any, query: string): string {

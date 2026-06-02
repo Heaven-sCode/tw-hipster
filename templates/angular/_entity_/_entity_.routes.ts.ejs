@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { <%= entity.name %>ListComponent } from './list/<%= toKebabCase(entity.name) %>-list.component';
 import { <%= entity.name %>DetailComponent } from './detail/<%= toKebabCase(entity.name) %>-detail.component';
 import { <%= entity.name %>FormPageComponent } from './form-page/<%= toKebabCase(entity.name) %>-form-page.component';
+import { <%= entity.name %>CardComponent } from './card/<%= toKebabCase(entity.name) %>-card.component';
 
 export default [
   {
@@ -9,6 +10,7 @@ export default [
     component: <%= entity.name %>ListComponent,
   },
   { path: ':id/view', component: <%= entity.name %>DetailComponent },
+  { path: ':id/card', component: <%= entity.name %>CardComponent },
   { path: ':id/edit', component: <%= entity.name %>FormPageComponent },
   { path: 'new', component: <%= entity.name %>FormPageComponent },
   <% relationships.forEach(rel => { %>

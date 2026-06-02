@@ -6,103 +6,12 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
 
   <!-- Filter Drawer -->
   <mat-drawer #filterDrawer mode="over" position="start" class="w-full sm:w-[34rem] max-w-full">
-    <form class="flex h-full w-full min-w-0 flex-col bg-card" [formGroup]="filtersForm" (ngSubmit)="applyFilters()">
-      <div class="border-b px-6 py-5">
-        <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0">
-            <h2 class="text-2xl font-bold tracking-tight">Advanced Filters</h2>
-            @if (getSelectedFilterChips().length) {
-              <div class="mt-3 flex flex-wrap gap-2">
-                @for (chip of getSelectedFilterChips(); track chip.key) {
-                  <span class="inline-flex max-w-full items-center rounded-full px-3 py-1 text-xs font-medium ring-1" [class]="chip.colorClass">
-                    <span class="truncate">{{ chip.label }}</span>
-                  </span>
-                }
-              </div>
-            }
-          </div>
-          <button mat-icon-button type="button" (click)="closeFilterDrawer()">
-            <mat-icon svgIcon="x"></mat-icon>
-          </button>
-        </div>
-      </div>
-
-      <div class="flex-auto overflow-y-auto px-6 py-6">
-        <div class="flex flex-col gap-4">
-          <ng-container *ngFor="let field of filterFields">
-            <div
-              class="w-full rounded-2xl border border-neutral-200 bg-neutral-50/60 p-4"
-              [formGroup]="fieldGroup(field.key)"
-            >
-              <div class="mb-4 flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <h3 class="truncate text-base font-semibold text-neutral-900">{{ field.label }}</h3>
-                  <p class="mt-1 text-xs uppercase tracking-wide text-neutral-500">
-                    {{ field.valueType }} filter
-                  </p>
-                </div>
-                <button mat-button type="button" (click)="clearField(field.key)">
-                  Clear
-                </button>
-              </div>
-
-              <div class="mb-2 text-sm font-medium text-neutral-700">Operator</div>
-              <mat-form-field appearance="outline" class="block w-full" subscriptSizing="dynamic">
-                <mat-select formControlName="operator">
-                  <mat-option value="">None</mat-option>
-                  <mat-option *ngFor="let operator of field.operators" [value]="operator.key">
-                    {{ operator.label }}
-                  </mat-option>
-                </mat-select>
-              </mat-form-field>
-
-              <ng-container *ngIf="operatorRequiresInput(field)">
-                <ng-container [ngSwitch]="currentOperatorValueType(field)">
-                  <div class="mt-1 mb-2 text-sm font-medium text-neutral-700">Value</div>
-                  <mat-form-field appearance="outline" class="mt-1 block w-full" subscriptSizing="dynamic" *ngSwitchCase="'string'">
-                    <input matInput formControlName="value" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" class="mt-1 block w-full" subscriptSizing="dynamic" *ngSwitchCase="'number'">
-                    <input matInput type="number" formControlName="value" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" class="mt-1 block w-full" subscriptSizing="dynamic" *ngSwitchCase="'date'">
-                    <input matInput [matDatepicker]="datePicker" formControlName="value" />
-                    <mat-datepicker-toggle matSuffix [for]="datePicker"></mat-datepicker-toggle>
-                    <mat-datepicker #datePicker></mat-datepicker>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" class="mt-1 block w-full" subscriptSizing="dynamic" *ngSwitchCase="'boolean'">
-                    <mat-select formControlName="value">
-                      <mat-option [value]="true">True</mat-option>
-                      <mat-option [value]="false">False</mat-option>
-                    </mat-select>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" class="mt-1 block w-full" subscriptSizing="dynamic" *ngSwitchCase="'enum'">
-                    <mat-select formControlName="value">
-                      <mat-option *ngFor="let option of getEnumOptions(field)" [value]="option">
-                        {{ option }}
-                      </mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                </ng-container>
-              </ng-container>
-            </div>
-          </ng-container>
-
-          <div *ngIf="!filterFields.length" class="rounded-2xl border border-dashed border-outline px-4 py-8 text-center text-sm text-disabled">
-            No filterable fields are available for this entity.
-          </div>
-        </div>
-      </div>
-
-      <div class="flex flex-col-reverse gap-3 border-t px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
-        <button mat-button type="button" (click)="clearFilters()">Clear All</button>
-        <button mat-flat-button color="primary" type="submit">Apply Filters</button>
-      </div>
-    </form>
+    <app-<%= toKebabCase(entity.name) %>-filter
+      [activeFilters]="activeFilters"
+      (applied)="handleFiltersApplied($event)"
+      (closed)="filterDrawer.close()"
+    >
+    </app-<%= toKebabCase(entity.name) %>-filter>
   </mat-drawer>
 
   <!-- Main Content (The Table) -->
@@ -110,51 +19,27 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
     <div class="absolute inset-0 flex min-w-0 flex-col overflow-hidden">
 
       <!-- Header (fixed, does not scroll) -->
-      <div class="bg-default dark:bg-transparent flex flex-0 flex-col p-6 pb-22 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:pb-28 sm:pt-12">
+      <div class="bg-default dark:bg-transparent flex flex-0 flex-col p-6 pb-22 xl:flex-row xl:items-center xl:justify-between xl:px-10 xl:pb-28 xl:pt-12">
         <div class="min-w-0 flex-1">
           <h2 class="truncate text-3xl font-extrabold leading-7 tracking-tight sm:leading-10 md:text-4xl">
-            <%= entity.name %> Management
+            <%= entity.name.replace(/([A-Z])/g, ' $1').trim() %> Management
           </h2>
         </div>
         <!-- Actions -->
-        <div class="mt-6 flex shrink-0 items-center gap-3 sm:ml-4 sm:mt-0">
-          
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-40">
-            <mat-select [(ngModel)]="searchBy" (ngModelChange)="onSearchChange()">
-                <mat-option *ngFor="let col of searchableColumns" [value]="col">
-                  {{ getColumnLabel(col) }}
-                </mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-64">
-              <mat-icon matPrefix svgIcon="search" class="text-neutral-500 mr-2"></mat-icon>
-              <input matInput placeholder="Search…" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()" />
-            </mat-form-field>
-
-          <div class="search-bar flex items-center gap-3">
-            <button *ngIf="filterFields.length" mat-stroked-button type="button" (click)="openFilterDrawer()">
-            <mat-icon svgIcon="search"></mat-icon>
-             <!-- <span class="ml-2">Filters</span> -->
-           </button>
-            <button mat-stroked-button type="button" [matMenuTriggerFor]="columnPreferenceMenu">
-              <mat-icon svgIcon="menu"></mat-icon>
-              <!-- <span class="ml-2">Columns</span> -->
-            </button>
-           <button mat-stroked-button type="button" (click)="viewMode = (viewMode === 'table' ? 'card' : 'table')" [matTooltip]="viewMode === 'table' ? 'Switch to Card View' : 'Switch to Table View'">
-             @if (viewMode === 'table') {
-               <mat-icon svgIcon="credit-card"></mat-icon>
-             } @else {
-               <mat-icon svgIcon="table"></mat-icon>
-             }
-           </button>
-
-            <button mat-flat-button color="primary" type="button" (click)="openFormDrawer()">
-              <mat-icon svgIcon="plus"></mat-icon>
-              <span class="ml-2">New <%= entity.name %></span>
-            </button>
-          </div>
-        </div>
+        <app-<%= toKebabCase(entity.name) %>-actions
+          [searchableColumns]="searchableColumns"
+          [searchBy]="searchBy"
+          [searchTerm]="searchTerm"
+          [viewMode]="viewMode"
+          [filterFieldsLength]="filterFields.length"
+          [columnMenu]="columnPreferenceMenu"
+          [allColumnPreferences]="allColumnPreferences"
+          (searchChange)="handleSearchChanged($event)"
+          (filterClick)="openFilterDrawer()"
+          (viewModeChange)="viewMode = $event"
+          (newClick)="openFormDrawer()"
+        >
+        </app-<%= toKebabCase(entity.name) %>-actions>
       </div>
 
       <!-- Main -->

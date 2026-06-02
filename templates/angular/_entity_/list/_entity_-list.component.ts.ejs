@@ -31,6 +31,8 @@ import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
 import { <%= entity.name %>Service } from '../service/<%= toKebabCase(entity.name) %>.service';
 import { <%= entity.name %>FormComponent } from '../form/<%= toKebabCase(entity.name) %>-form.component';
 import { <%= entity.name %>CardComponent } from '../card/<%= toKebabCase(entity.name) %>-card.component';
+import { <%= entity.name %>FilterComponent } from '../filter/<%= toKebabCase(entity.name) %>-filter.component';
+import { <%= entity.name %>ActionsComponent } from '../actions/<%= toKebabCase(entity.name) %>-actions.component';
 
 <%
 const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyToMany'].includes(rel.type));
@@ -180,8 +182,13 @@ const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = 
     MatSlideToggleModule, FormsModule,
     <%= entity.name %>FormComponent,
     <%= entity.name %>CardComponent,
+    <%= entity.name %>FilterComponent,
+    <%= entity.name %>ActionsComponent,
   ],
   templateUrl: './<%= toKebabCase(entity.name) %>-list.component.html',
+  host: {
+    class: 'relative flex flex-col flex-auto min-h-0 w-full',
+  },
 })
 export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   // --- Injected Services ---
@@ -191,7 +198,6 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly dialogRef = inject(MatDialogRef<<%= entity.name %>ListComponent>, { optional: true });
   private readonly dialogData = inject(MAT_DIALOG_DATA, { optional: true }) as ParentDialogData | null;
-  private readonly fb = inject(FormBuilder);
 
   // --- State & Triggers ---
   viewMode: 'table' | 'card' = 'table';
@@ -201,7 +207,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   itemsPerPage = 10;
   private readonly refreshTrigger = new Subject<void>();
   private baseParentFilters: Record<string, string | number> = {};
-  private activeFilters: Record<string, string> = {};
+  protected activeFilters: Record<string, string> = {};
   private readonly columnPreferenceStorageKey = '<%= toKebabCase(entity.name) %>-list-column-preferences';
 
   selected<%= entity.name %>: I<%= entity.name %> | null = null;
@@ -269,8 +275,6 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     },
     <% }); %>
   ];
-
-  filtersForm: FormGroup = this.buildFiltersForm();
 
   // --- Table & Drawer ---
   @ViewChild('filterDrawer') filterDrawer!: MatDrawer;
@@ -440,68 +444,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     });
   }
 
-  applyFilters(): void {
-    const filters: Record<string, string> = {};
-
-    this.filterFields.forEach(field => {
-      const group = this.fieldGroup(field.key);
-      const operator = group?.get('operator')?.value as string | undefined;
-      if (!operator) {
-        return;
-      }
-      const operatorConfig = field.operators.find(item => item.key === operator);
-      if (!operatorConfig) {
-        return;
-      }
-      const rawValue = group.get('value')?.value;
-      if (operatorConfig.requiresValue) {
-        if (rawValue === null || rawValue === '' || (Array.isArray(rawValue) && rawValue.length === 0)) {
-          return;
-        }
-      }
-
-      let paramValue: string | null = null;
-      switch (operatorConfig.valueType) {
-        case 'boolean': {
-          const boolValue = rawValue === true || rawValue === 'true';
-          paramValue = boolValue ? 'true' : 'false';
-          break;
-        }
-        case 'number': {
-          const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue);
-          if (Number.isNaN(numeric)) {
-            return;
-          }
-          paramValue = String(numeric);
-          break;
-        }
-        case 'date': {
-          if (rawValue instanceof Date) {
-            if (field.rawFieldType === 'LocalDate') {
-              const iso = rawValue.toISOString();
-              paramValue = iso.split('T')[0];
-            } else {
-              paramValue = rawValue.toISOString();
-            }
-          } else if (typeof rawValue === 'string' && rawValue) {
-            paramValue = rawValue;
-          }
-          break;
-        }
-        default: {
-          if (rawValue !== null && rawValue !== undefined) {
-            paramValue = String(rawValue);
-          }
-        }
-      }
-
-      if (paramValue === null) {
-        return;
-      }
-
-      filters[`${field.key}.${operator}`] = paramValue;
-    });
-
+  handleFiltersApplied(filters: Record<string, string>): void {
     this.activeFilters = filters;
     if (this.paginator) {
       this.paginator.firstPage();
@@ -509,70 +452,6 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     this.refreshTrigger.next();
     this.loadData();
     this.closeFilterDrawer();
-  }
-
-  clearFilters(): void {
-    this.filterFields.forEach(field => this.clearField(field.key));
-    this.activeFilters = {};
-    if (this.paginator) {
-      this.paginator.firstPage();
-    }
-    this.refreshTrigger.next();
-    this.loadData();
-  }
-
-  clearField(key: string): void {
-    const group = this.fieldGroup(key);
-    group?.setValue({ operator: '', value: null });
-  }
-
-  fieldGroup(key: string): FormGroup {
-    return this.filtersForm.get(key) as FormGroup;
-  }
-
-  operatorRequiresInput(field: FilterField): boolean {
-    const config = this.currentOperatorConfig(field);
-    return !!config?.requiresValue;
-  }
-
-  currentOperatorValueType(field: FilterField): FilterValueType {
-    return this.currentOperatorConfig(field)?.valueType ?? field.valueType;
-  }
-
-  getEnumOptions(field: FilterField): string[] {
-    if (!field.enumOptionsKey) {
-      return [];
-    }
-    return (this as any)[field.enumOptionsKey] ?? [];
-  }
-
-  getSelectedFilterChips(): FilterChip[] {
-    return this.filterFields
-      .map(field => {
-        const group = this.fieldGroup(field.key);
-        const operator = group?.get('operator')?.value as string | undefined;
-        if (!operator) {
-          return null;
-        }
-
-        const operatorConfig = field.operators.find(item => item.key === operator);
-        if (!operatorConfig) {
-          return null;
-        }
-
-        const rawValue = group.get('value')?.value;
-        const formattedValue = this.formatFilterChipValue(field, operatorConfig, rawValue);
-        const label = operatorConfig.requiresValue && formattedValue
-          ? `${field.label}: ${operatorConfig.label} ${formattedValue}`
-          : `${field.label}: ${operatorConfig.label}`;
-
-        return {
-          key: `${field.key}.${operator}`,
-          label,
-          colorClass: this.getFilterChipColorClass(`${field.key}.${operator}`),
-        };
-      })
-      .filter((chip): chip is FilterChip => chip !== null);
   }
 
   exportFilteredData(): void {
@@ -618,57 +497,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   }
   <% }); %>
 
-  private buildFiltersForm(): FormGroup {
-    const groupConfig = this.filterFields.reduce((acc, field) => {
-      acc[field.key] = this.fb.group({
-        operator: [''],
-        value: [null],
-      });
-      return acc;
-    }, {} as Record<string, FormGroup>);
-    return this.fb.group(groupConfig);
-  }
 
-  private currentOperatorConfig(field: FilterField): FilterFieldOperator | undefined {
-    const group = this.fieldGroup(field.key);
-    if (!group) {
-      return undefined;
-    }
-    const operator = group.get('operator')?.value as string | undefined;
-    return field.operators.find(item => item.key === operator);
-  }
-
-  private formatFilterChipValue(
-    field: FilterField,
-    operator: FilterFieldOperator,
-    rawValue: unknown
-  ): string {
-    if (!operator.requiresValue || rawValue === null || rawValue === undefined || rawValue === '') {
-      return '';
-    }
-
-    switch (operator.valueType) {
-      case 'boolean':
-        return rawValue === true || rawValue === 'true' ? 'True' : 'False';
-      case 'date':
-        if (rawValue instanceof Date) {
-          return field.rawFieldType === 'LocalDate'
-            ? rawValue.toISOString().split('T')[0]
-            : rawValue.toLocaleString();
-        }
-        return String(rawValue);
-      default:
-        return String(rawValue);
-    }
-  }
-
-  private getFilterChipColorClass(key: string): string {
-    let hash = 0;
-    for (let index = 0; index < key.length; index += 1) {
-      hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
-    }
-    return this.filterChipColorClasses[hash % this.filterChipColorClasses.length];
-  }
 
   private exportData(filters: Record<string, string | number>): void {
     this.isExporting = true;
@@ -774,15 +603,15 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     return String(value);
   }
 
-  onSearchChange(): void {
+  handleSearchChanged(event: { searchBy: string; searchTerm: string }): void {
+    this.searchBy = event.searchBy;
+    this.searchTerm = event.searchTerm;
+
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(this.storageKeySearchTerm, this.searchTerm);
       localStorage.setItem(this.storageKeySearchBy, this.searchBy);
     }
-    this.applySearchFilter();
-  }
 
-  private applySearchFilter(): void {
     // Clear previous search filters
     this.searchableColumns.forEach(col => {
       delete this.activeFilters[`${col}.contains`];

@@ -1,0 +1,381 @@
+import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+
+<%
+const uniqueEnumImports = new Map();
+entity.fields.forEach(field => {
+  if (field.fieldTypeIsEnum) {
+    if (!uniqueEnumImports.has(field.fieldType)) {
+      uniqueEnumImports.set(field.fieldType, `import { ${field.fieldType} } from '../../../enums/${toKebabCase(field.fieldType)}.model';`);
+    }
+  }
+});
+
+function getFilterValueType(fieldType, isEnum) {
+  if (isEnum) return 'enum';
+  const numericTypes = ['Integer', 'Long', 'Float', 'Double', 'BigDecimal'];
+  const dateTypes = ['LocalDate', 'Instant', 'ZonedDateTime'];
+  if (fieldType === 'Boolean') return 'boolean';
+  if (numericTypes.includes(fieldType)) return 'number';
+  if (dateTypes.includes(fieldType)) return 'date';
+  return 'string';
+}
+
+function relationshipFilterKey(rel) {
+  const base = rel.from.fieldName ? toCamelCase(rel.from.fieldName) : toCamelCase(rel.otherEntityName);
+  return base.endsWith('Id') ? base : `${base}Id`;
+}
+%>
+<%- Array.from(uniqueEnumImports.values()).join('\n') %>
+
+type FilterValueType = 'string' | 'number' | 'date' | 'boolean' | 'enum';
+
+interface FilterFieldOperator {
+  key: string;
+  label: string;
+  requiresValue: boolean;
+  valueType: FilterValueType;
+}
+
+interface FilterField {
+  key: string;
+  label: string;
+  valueType: FilterValueType;
+  operators: FilterFieldOperator[];
+  rawFieldType?: string;
+  enumOptionsKey?: string;
+}
+
+interface FilterChip {
+  key: string;
+  label: string;
+  colorClass: string;
+}
+
+const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = {
+  string: [
+    { key: 'contains', label: 'Contains', requiresValue: true, valueType: 'string' },
+    { key: 'equals', label: 'Equals', requiresValue: true, valueType: 'string' },
+    { key: 'notEquals', label: 'Not Equals', requiresValue: true, valueType: 'string' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+  number: [
+    { key: 'equals', label: 'Equals', requiresValue: true, valueType: 'number' },
+    { key: 'greaterThan', label: 'Greater Than', requiresValue: true, valueType: 'number' },
+    { key: 'greaterThanOrEqual', label: 'Greater Than Or Equal', requiresValue: true, valueType: 'number' },
+    { key: 'lessThan', label: 'Less Than', requiresValue: true, valueType: 'number' },
+    { key: 'lessThanOrEqual', label: 'Less Than Or Equal', requiresValue: true, valueType: 'number' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+  date: [
+    { key: 'equals', label: 'On', requiresValue: true, valueType: 'date' },
+    { key: 'greaterThanOrEqual', label: 'After Or Equal', requiresValue: true, valueType: 'date' },
+    { key: 'lessThanOrEqual', label: 'Before Or Equal', requiresValue: true, valueType: 'date' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+  boolean: [
+    { key: 'equals', label: 'Equals', requiresValue: true, valueType: 'boolean' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+  enum: [
+    { key: 'equals', label: 'Equals', requiresValue: true, valueType: 'enum' },
+    { key: 'notEquals', label: 'Not Equals', requiresValue: true, valueType: 'enum' },
+    { key: 'specified', label: 'Is Specified', requiresValue: true, valueType: 'boolean' },
+  ],
+};
+
+@Component({
+  selector: 'app-<%= toKebabCase(entity.name) %>-filter',
+  templateUrl: './<%= toKebabCase(entity.name) %>-filter.component.html',
+  host: {
+    class: 'flex flex-col h-full w-full',
+  },
+  standalone: true,
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatIconModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatDatepickerModule,
+    MatNativeDateModule
+  ]
+})
+export class <%= entity.name %>FilterComponent implements OnInit {
+  private readonly fb = inject(FormBuilder);
+
+  @Input() activeFilters: Record<string, string> = {};
+  @Output() applied = new EventEmitter<Record<string, string>>();
+  @Output() closed = new EventEmitter<void>();
+
+  filtersForm!: FormGroup;
+
+  <% entity.fields.forEach(field => { if (field.fieldTypeIsEnum) { %>
+  readonly <%= toCamelCase(field.fieldType) %>Options = Object.keys(<%= field.fieldType %>);
+  <% }}); %>
+
+  readonly filterChipColorClasses = [
+    'bg-blue-50 text-blue-700 ring-blue-200',
+    'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    'bg-amber-50 text-amber-700 ring-amber-200',
+    'bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200',
+    'bg-cyan-50 text-cyan-700 ring-cyan-200',
+    'bg-rose-50 text-rose-700 ring-rose-200',
+    'bg-violet-50 text-violet-700 ring-violet-200',
+    'bg-lime-50 text-lime-700 ring-lime-200',
+  ];
+
+  filterFields: FilterField[] = [
+    <% entity.fields.forEach(field => { 
+         const valueType = getFilterValueType(field.fieldType, field.fieldTypeIsEnum);
+         const enumOptionsKey = field.fieldTypeIsEnum ? `${toCamelCase(field.fieldType)}Options` : null;
+    %>
+    {
+      key: '<%= field.fieldName %>',
+      label: '<%= toPascalCase(field.fieldName) %>',
+      valueType: '<%= valueType %>' as FilterValueType,
+      operators: FILTER_OPERATOR_LIBRARY['<%= valueType %>'],
+      rawFieldType: '<%= field.fieldType %>'<% if (enumOptionsKey) { %>,
+      enumOptionsKey: '<%= enumOptionsKey %>'<% } %>
+    },
+    <% }); %>
+    <% relationships.filter(rel => ['ManyToOne', 'OneToOne'].includes(rel.type)).forEach(rel => { 
+         const key = relationshipFilterKey(rel);
+         const label = rel.from.fieldName ? toPascalCase(rel.from.fieldName) : rel.otherEntityNamePascalCase;
+    %>
+    {
+      key: '<%= key %>',
+      label: '<%= label %>',
+      valueType: 'number' as FilterValueType,
+      operators: FILTER_OPERATOR_LIBRARY['number'],
+      rawFieldType: 'Long'
+    },
+    <% }); %>
+  ];
+
+  ngOnInit(): void {
+    this.filtersForm = this.buildFiltersForm();
+    this.populateFormFromActiveFilters();
+  }
+
+  applyFilters(): void {
+    const filters: Record<string, string> = {};
+
+    this.filterFields.forEach(field => {
+      const group = this.fieldGroup(field.key);
+      const operator = group?.get('operator')?.value as string | undefined;
+      if (!operator) {
+        return;
+      }
+      const operatorConfig = field.operators.find(item => item.key === operator);
+      if (!operatorConfig) {
+        return;
+      }
+      const rawValue = group.get('value')?.value;
+      if (operatorConfig.requiresValue) {
+        if (rawValue === null || rawValue === '' || (Array.isArray(rawValue) && rawValue.length === 0)) {
+          return;
+        }
+      }
+
+      let paramValue: string | null = null;
+      switch (operatorConfig.valueType) {
+        case 'boolean': {
+          const boolValue = rawValue === true || rawValue === 'true';
+          paramValue = boolValue ? 'true' : 'false';
+          break;
+        }
+        case 'number': {
+          const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue);
+          if (Number.isNaN(numeric)) {
+            return;
+          }
+          paramValue = String(numeric);
+          break;
+        }
+        case 'date': {
+          if (rawValue instanceof Date) {
+            if (field.rawFieldType === 'LocalDate') {
+              const iso = rawValue.toISOString();
+              paramValue = iso.split('T')[0];
+            } else {
+              paramValue = rawValue.toISOString();
+            }
+          } else if (typeof rawValue === 'string' && rawValue) {
+            paramValue = rawValue;
+          }
+          break;
+        }
+        default: {
+          if (rawValue !== null && rawValue !== undefined) {
+            paramValue = String(rawValue);
+          }
+        }
+      }
+
+      if (paramValue === null) {
+        return;
+      }
+
+      filters[`${field.key}.${operator}`] = paramValue;
+    });
+
+    this.applied.emit(filters);
+  }
+
+  clearFilters(): void {
+    this.filterFields.forEach(field => this.clearField(field.key));
+    this.applied.emit({});
+  }
+
+  clearField(key: string): void {
+    const group = this.fieldGroup(key);
+    group?.setValue({ operator: '', value: null });
+  }
+
+  fieldGroup(key: string): FormGroup {
+    return this.filtersForm.get(key) as FormGroup;
+  }
+
+  operatorRequiresInput(field: FilterField): boolean {
+    const config = this.currentOperatorConfig(field);
+    return !!config?.requiresValue;
+  }
+
+  currentOperatorValueType(field: FilterField): FilterValueType {
+    return this.currentOperatorConfig(field)?.valueType ?? field.valueType;
+  }
+
+  getEnumOptions(field: FilterField): string[] {
+    if (!field.enumOptionsKey) {
+      return [];
+    }
+    return (this as any)[field.enumOptionsKey] ?? [];
+  }
+
+  getSelectedFilterChips(): FilterChip[] {
+    return this.filterFields
+      .map(field => {
+        const group = this.fieldGroup(field.key);
+        const operator = group?.get('operator')?.value as string | undefined;
+        if (!operator) {
+          return null;
+        }
+
+        const operatorConfig = field.operators.find(item => item.key === operator);
+        if (!operatorConfig) {
+          return null;
+        }
+
+        const rawValue = group.get('value')?.value;
+        const formattedValue = this.formatFilterChipValue(field, operatorConfig, rawValue);
+        const label = operatorConfig.requiresValue && formattedValue
+          ? `${field.label}: ${operatorConfig.label} ${formattedValue}`
+          : `${field.label}: ${operatorConfig.label}`;
+
+        return {
+          key: `${field.key}.${operator}`,
+          label,
+          colorClass: this.getFilterChipColorClass(`${field.key}.${operator}`),
+        };
+      })
+      .filter((chip): chip is FilterChip => chip !== null);
+  }
+
+  closeFilterDrawer(): void {
+    this.closed.emit();
+  }
+
+  private buildFiltersForm(): FormGroup {
+    const groupConfig = this.filterFields.reduce((acc, field) => {
+      acc[field.key] = this.fb.group({
+        operator: [''],
+        value: [null],
+      });
+      return acc;
+    }, {} as Record<string, FormGroup>);
+    return this.fb.group(groupConfig);
+  }
+
+  private currentOperatorConfig(field: FilterField): FilterFieldOperator | undefined {
+    const group = this.fieldGroup(field.key);
+    if (!group) {
+      return undefined;
+    }
+    const operator = group.get('operator')?.value as string | undefined;
+    return field.operators.find(item => item.key === operator);
+  }
+
+  private formatFilterChipValue(
+    field: FilterField,
+    operator: FilterFieldOperator,
+    rawValue: unknown
+  ): string {
+    if (!operator.requiresValue || rawValue === null || rawValue === undefined || rawValue === '') {
+      return '';
+    }
+
+    switch (operator.valueType) {
+      case 'boolean':
+        return rawValue === true || rawValue === 'true' ? 'True' : 'False';
+      case 'date':
+        if (rawValue instanceof Date) {
+          return field.rawFieldType === 'LocalDate'
+            ? rawValue.toISOString().split('T')[0]
+            : rawValue.toLocaleString();
+        }
+        return String(rawValue);
+      default:
+        return String(rawValue);
+    }
+  }
+
+  private getFilterChipColorClass(key: string): string {
+    let hash = 0;
+    for (let index = 0; index < key.length; index += 1) {
+      hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
+    }
+    return this.filterChipColorClasses[hash % this.filterChipColorClasses.length];
+  }
+
+  private populateFormFromActiveFilters(): void {
+    if (!this.activeFilters) return;
+
+    Object.entries(this.activeFilters).forEach(([fullKey, value]) => {
+      const lastDotIndex = fullKey.lastIndexOf('.');
+      if (lastDotIndex === -1) return;
+
+      const fieldKey = fullKey.substring(0, lastDotIndex);
+      const operator = fullKey.substring(lastDotIndex + 1);
+
+      const field = this.filterFields.find(f => f.key === fieldKey);
+      if (!field) return;
+
+      const group = this.fieldGroup(fieldKey);
+      if (group) {
+        let typedValue: any = value;
+        const operatorConfig = field.operators.find(op => op.key === operator);
+        if (operatorConfig) {
+          if (operatorConfig.valueType === 'number') {
+            typedValue = Number(value);
+          } else if (operatorConfig.valueType === 'boolean') {
+            typedValue = value === 'true';
+          } else if (operatorConfig.valueType === 'date') {
+            typedValue = new Date(value);
+          }
+        }
+        group.setValue({ operator, value: typedValue });
+      }
+    });
+  }
+}

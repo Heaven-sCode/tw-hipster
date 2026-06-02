@@ -375,6 +375,12 @@ async function generateEntityFiles(config, entity, allRelationships) {
         { template: '_entity_-card.component.ts.ejs', subfolder: 'card', outputPattern: '<%= entityName %>-card.component.ts' },
         { template: '_entity_-card.component.html.ejs', subfolder: 'card', outputPattern: '<%= entityName %>-card.component.html' },
         { template: '_entity_-card.component.css.ejs', subfolder: 'card', outputPattern: '<%= entityName %>-card.component.css' },
+        // Filter component
+        { template: '_entity_-filter.component.ts.ejs', subfolder: 'filter', outputPattern: '<%= entityName %>-filter.component.ts' },
+        { template: '_entity_-filter.component.html.ejs', subfolder: 'filter', outputPattern: '<%= entityName %>-filter.component.html' },
+        // Actions component
+        { template: '_entity_-actions.component.ts.ejs', subfolder: 'actions', outputPattern: '<%= entityName %>-actions.component.ts' },
+        { template: '_entity_-actions.component.html.ejs', subfolder: 'actions', outputPattern: '<%= entityName %>-actions.component.html' },
         // Existing drawer form component
         { template: '_entity_-form.component.ts.ejs', subfolder: 'form', outputPattern: '<%= entityName %>-form.component.ts' },
         { template: '_entity_-form.component.html.ejs', subfolder: 'form', outputPattern: '<%= entityName %>-form.component.html' },
