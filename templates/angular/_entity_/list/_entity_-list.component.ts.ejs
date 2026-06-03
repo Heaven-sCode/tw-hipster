@@ -1,5 +1,5 @@
 // This is an EJS template. It generates the list component TypeScript file.
-import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
+import { AfterViewInit, Component, OnInit, ViewChild, inject, HostListener, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
@@ -10,6 +10,7 @@ import dayjs from 'dayjs/esm';
 
 // Angular Material & Fuse
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import { FuseConfirmationService } from '@fuse/services/confirmation';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSidenavModule, MatDrawer } from '@angular/material/sidenav';
@@ -37,6 +38,9 @@ import { <%= entity.name %>ActionsComponent } from '../actions/<%= toKebabCase(e
 <%
 const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyToMany'].includes(rel.type));
 const relationshipComponentImports = new Map();
+function toSpacedLabel(str) {
+  return str.replace(/([A-Z])/g, ' $1').trim().replace(/^./, c => c.toUpperCase());
+}
 collectionRelationships.forEach(rel => {
   if (!relationshipComponentImports.has(rel.otherEntityName)) {
     relationshipComponentImports.set(
@@ -189,6 +193,7 @@ const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = 
   host: {
     class: 'relative flex flex-col flex-auto min-h-0 w-full',
   },
+  styleUrls: ['./<%= toKebabCase(entity.name) %>-list.component.scss']
 })
 export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   // --- Injected Services ---
@@ -198,6 +203,8 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly dialogRef = inject(MatDialogRef<<%= entity.name %>ListComponent>, { optional: true });
   private readonly dialogData = inject(MAT_DIALOG_DATA, { optional: true }) as ParentDialogData | null;
+  private readonly confirmationService = inject(FuseConfirmationService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   // --- State & Triggers ---
   viewMode: 'table' | 'card' = 'table';
@@ -277,17 +284,17 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   ];
 
   // --- Table & Drawer ---
-  @ViewChild('filterDrawer') filterDrawer!: MatDrawer;
-  @ViewChild('formDrawer') formDrawer!: MatDrawer;
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
-  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild('tableWrapper') tableWrapper!: ElementRef<HTMLElement>;
+  isActionsShadowVisible = false;
+  readonly storageKeyPageSize = '<%= toKebabCase(entity.name) %>-page-size';
 
   readonly allColumnPreferences: TableColumnPreference[] = [
     { key: 'state', label: 'State', alwaysVisible: true },
-    { key: 'id', label: 'ID', alwaysVisible: true },
-    <% entity.fields.forEach(field => { %>{ key: '<%= field.fieldName %>', label: '<%= toPascalCase(field.fieldName) %>' },
+    { key: 'id', label: 'ID' },
+    <% entity.fields.forEach(field => { %>{ key: '<%= field.fieldName %>', label: '<%= toSpacedLabel(field.fieldName) %>' },
     <% }); %>
-    <% collectionRelationships.forEach(rel => { %>{ key: 'actions-<%= rel.otherEntityName %>', label: '<%= rel.otherEntityNamePascalCase %>' },
+
+    <% collectionRelationships.forEach(rel => { %>{ key: 'actions-<%= rel.otherEntityName %>', label: '<%= toSpacedLabel(rel.otherEntityNamePascalCase) %>' },
     <% }); %>
     { key: 'actions', label: 'Actions', alwaysVisible: true },
   ];
@@ -300,8 +307,30 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     }
     this.restoreColumnPreferences();
     this.loadSearchState();
+    if (typeof localStorage !== 'undefined') {
+      const savedPageSize = localStorage.getItem(this.storageKeyPageSize);
+      if (savedPageSize) {
+        this.itemsPerPage = Number(savedPageSize);
+      }
+    }
     if (this.dialogData?.parentFilters) {
       this.baseParentFilters = { ...this.dialogData.parentFilters };
+    }
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.onTableScroll();
+  }
+
+  onTableScroll(): void {
+    if (!this.tableWrapper) return;
+    const target = this.tableWrapper.nativeElement;
+    const maxScroll = target.scrollWidth - target.clientWidth;
+    const nextState = maxScroll > 0 && target.scrollLeft < maxScroll - 2;
+    if (this.isActionsShadowVisible !== nextState) {
+      this.isActionsShadowVisible = nextState;
+    setTimeout(() => this.cdr.detectChanges());
     }
   }
 
@@ -334,6 +363,11 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
       return;
     }
 
+    if (typeof localStorage !== 'undefined' && this.paginator.pageSize !== this.itemsPerPage) {
+      this.itemsPerPage = this.paginator.pageSize;
+      localStorage.setItem(this.storageKeyPageSize, String(this.itemsPerPage));
+    }
+
     this.isLoading = true;
     const req = {
       page: this.paginator.pageIndex,
@@ -348,9 +382,12 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
         this.isLoading = false;
         this.totalItems = Number(res.headers.get('X-Total-Count') ?? 0);
         this.dataSource.data = this.sortRowsForDisplay(res.body ?? []);
+        this.cdr.detectChanges();
+        setTimeout(() => this.onTableScroll(), 0);
       }),
       catchError(() => {
         this.isLoading = false;
+        this.cdr.detectChanges();
         return of(null);
       })
     ).subscribe();
@@ -397,11 +434,28 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
 
   openFormDrawer(id?: number): void {
     if (id) {
-      this.drawerMode = 'edit';
-      this.<%= toCamelCase(entity.name) %>Service.find(id).subscribe(response => {
-        if (response.body) {
-          this.selected<%= entity.name %> = response.body;
-          this.formDrawer.open();
+      this.confirmationService.open({
+        title: 'Edit <%= entity.name %>',
+        message: 'Are you sure you want to edit this <%= toCamelCase(entity.name) %>?',
+        icon: {
+          show: true,
+          name: 'heroicons_outline:pencil-square',
+          color: 'info'
+        },
+        actions: {
+          confirm: {
+            label: 'Edit',
+            color: 'primary'
+          },
+          cancel: {
+            label: 'Cancel'
+          }
+        },
+        dismissible: true
+      }).afterClosed().subscribe(result => {
+        if (result === 'confirmed') {
+          this.drawerMode = 'edit';
+          this.openEdit(id);
         }
       });
     } else {
@@ -409,6 +463,15 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
       this.selected<%= entity.name %> = null;
       this.formDrawer.open();
     }
+  }
+
+  openEdit(id: number): void {
+    this.<%= toCamelCase(entity.name) %>Service.find(id).subscribe(response => {
+      if (response.body) {
+        this.selected<%= entity.name %> = response.body;
+        this.formDrawer.open();
+      }
+    });
   }
 
   closeFormDrawer(): void {
@@ -431,14 +494,17 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   }
 
   delete(id: number): void {
-    const confirmed = globalThis.confirm(
-      'Delete <%= entity.name %>?\n\nAre you sure you want to delete this? This action cannot be undone.'
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    this.<%= toCamelCase(entity.name) %>Service.delete(id).subscribe(() => {
+    this.confirmationService.open({
+      title: 'Delete <%= entity.name %>',
+      message: 'Are you sure you want to delete this? This action cannot be undone.',
+      icon: 'warning',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel'
+    }).afterClosed().subscribe(confirmed => {
+      if (!confirmed) {
+        return;
+      }
+      this.<%= toCamelCase(entity.name) %>Service.delete(id).subscribe(() => {
       this.refreshTrigger.next();
       this.loadData();
     });
@@ -679,6 +745,100 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
       return 'text-neutral-300';
     }
     return this.rowFlagOptions.find(option => option.key === colorKey)?.iconClass ?? 'text-neutral-300';
+  }
+
+  <% if (entity.fields.some(f => f.fieldName === 'isActive')) { %>
+  toggleActive(element: I<%= entity.name %>): void {
+    if (element.id === undefined) return;
+    
+    const newActiveState = !element.isActive;
+    const actionLabel = newActiveState ? 'Activate' : 'Deactivate';
+    
+    this.confirmationService.open({
+      title: `${actionLabel} <%= entity.name %>`,
+      message: `Are you sure you want to ${newActiveState ? 'activate' : 'deactivate'} this <%= toCamelCase(entity.name) %>?`,
+      icon: {
+        show: true,
+        name: 'heroicons_outline:information-circle',
+        color: newActiveState ? 'success' : 'warn'
+      },
+      actions: {
+        confirm: {
+          label: actionLabel,
+          color: newActiveState ? 'primary' : 'warn'
+        },
+        cancel: {
+          label: 'Cancel'
+        }
+      },
+      dismissible: true
+    }).afterClosed().subscribe(result => {
+      if (result === 'confirmed') {
+        const updated = { ...element, isActive: newActiveState };
+        this.<%= toCamelCase(entity.name) %>Service.update(updated).subscribe(() => {
+          this.refreshTrigger.next();
+          this.loadData();
+        });
+      }
+    });
+  }
+  <% } %>
+
+  getRowClass(element: I<%= entity.name %>): string {
+    let classes = '';
+    const colorKey = this.getFlagColor(element.id);
+    if (colorKey) {
+      classes = 'has-flag ';
+      switch (colorKey) {
+        case 'slate':
+          classes += 'bg-slate-50/80 dark:bg-slate-900/20 hover:bg-slate-100/80 dark:hover:bg-slate-950/30';
+          break;
+        case 'blue':
+          classes += 'bg-blue-50/80 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-950/30';
+          break;
+        case 'emerald':
+          classes += 'bg-emerald-50/80 dark:bg-emerald-900/20 hover:bg-emerald-100/80 dark:hover:bg-emerald-950/30';
+          break;
+        case 'amber':
+          classes += 'bg-amber-50/80 dark:bg-amber-900/20 hover:bg-amber-100/80 dark:hover:bg-amber-950/30';
+          break;
+        case 'rose':
+          classes += 'bg-rose-50/80 dark:bg-rose-900/20 hover:bg-rose-100/80 dark:hover:bg-rose-950/30';
+          break;
+        case 'violet':
+          classes += 'bg-violet-50/80 dark:bg-violet-900/20 hover:bg-violet-100/80 dark:hover:bg-violet-950/30';
+          break;
+      }
+    }
+    <% if (entity.fields.some(f => f.fieldName === 'isActive')) { %>
+    if (element.isActive === false) {
+      classes += ' opacity-50';
+    }
+    <% } %>
+    return classes;
+  }
+
+  getStickyClass(element: I<%= entity.name %>): string {
+    const colorKey = this.getFlagColor(element.id);
+    if (!colorKey) {
+      return 'sticky-actions-default';
+    }
+    switch (colorKey) {
+      case 'slate':
+        return '!bg-slate-50/90 dark:!bg-slate-950/40 group-hover:!bg-slate-100/90 dark:group-hover:!bg-slate-900/50';
+      case 'blue':
+        return '!bg-blue-50/90 dark:!bg-blue-950/40 group-hover:!bg-blue-100/90 dark:group-hover:!bg-blue-900/50';
+      case 'emerald':
+        return '!bg-emerald-50/90 dark:!bg-emerald-950/40 group-hover:!bg-emerald-100/90 dark:group-hover:!bg-emerald-900/50';
+      case 'amber':
+        return '!bg-amber-50/90 dark:!bg-amber-950/40 group-hover:!bg-amber-100/90 dark:group-hover:!bg-amber-900/50';
+      case 'rose':
+        return '!bg-rose-50/90 dark:!bg-rose-950/40 group-hover:!bg-rose-100/90 dark:group-hover:!bg-rose-900/50';
+      case 'violet':
+        return '!bg-violet-50/90 dark:!bg-violet-950/40 group-hover:!bg-violet-100/90 dark:group-hover:!bg-violet-900/50';
+      default:
+        return 'sticky-actions-default';
+    }
   }
 
   getColumnLabel(key: string): string {
