@@ -37,10 +37,11 @@
          <mat-icon svgIcon="funnel" class="m-0"></mat-icon>
       </span>
     </button>
-    <button mat-flat-button color="primary" type="button" (click)="newClick.emit()">
-      <mat-icon svgIcon="plus"></mat-icon>
-      <!-- <span class="ml-2">New <%= entity.name %></span> -->
-      <span class="ml-2">New</span>
+    <button mat-flat-button color="primary" type="button" class="h-10" (click)="newClick.emit()">
+      <span class="flex items-center justify-center">
+        <mat-icon svgIcon="plus" class="m-0 mr-2"></mat-icon>
+        <span>New</span>
+      </span>
     </button>
   </div>
 </div>

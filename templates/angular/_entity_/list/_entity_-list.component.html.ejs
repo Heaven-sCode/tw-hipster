@@ -1,6 +1,9 @@
 <!-- This is an EJS template. It generates the HTML for the list component. -->
 <%
 const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyToMany'].includes(rel.type));
+const toSpacedLabel = (str) => {
+  return str.replace(/([A-Z])/g, ' $1').trim().replace(/^./, c => c.toUpperCase());
+};
 %>
 <mat-drawer-container class="absolute h-full w-full bg-transparent">
 
@@ -53,7 +56,7 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
               <mat-progress-spinner [diameter]="40" [mode]="'indeterminate'"></mat-progress-spinner>
             </div>
 
-            <div class="-m-6 overflow-x-auto sm:-m-10" *ngIf="!isLoading">
+            <div #tableWrapper class="-m-6 overflow-auto flex-auto sm:-m-10 min-h-[520px] pb-[100px]" *ngIf="!isLoading" (scroll)="onTableScroll()" cdkScrollable>
               <table
                 mat-table
                 [dataSource]="dataSource"
@@ -68,7 +71,7 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
 
               <!-- Dynamically generate columns for entity fields -->
               <ng-container matColumnDef="id">
-                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header>ID</th>
+                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'id'" tableId="<%= toKebabCase(entity.name) %>">ID</th>
                 <td mat-cell *matCellDef="let element">{{ element.id }}</td>
               </ng-container>
               <ng-container matColumnDef="state">
@@ -99,7 +102,7 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
               </ng-container>
               <% entity.fields.forEach(field => { %>
               <ng-container matColumnDef="<%= field.fieldName %>">
-                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header><%= toPascalCase(field.fieldName) %></th>
+                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'<%= field.fieldName %>'" tableId="<%= toKebabCase(entity.name) %>"><%= toSpacedLabel(field.fieldName) %></th>
                 <% if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>
                 <td mat-cell *matCellDef="let element">{{ element.<%= field.fieldName %>?.toDate() | date: 'medium' }}</td>
                 <% } else if (field.fieldType === 'Boolean') { %>
@@ -125,7 +128,7 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
               <!-- Generate columns for "Show Children" buttons -->
               <% collectionRelationships.forEach(rel => { %>
               <ng-container matColumnDef="actions-<%= rel.otherEntityName %>">
-                <th mat-header-cell cdkDrag *matHeaderCellDef> <%= rel.otherEntityNamePascalCase %> </th>
+                <th mat-header-cell cdkDrag *matHeaderCellDef [appResizable]="'actions-<%= rel.otherEntityName %>'" tableId="<%= toKebabCase(entity.name) %>"> <%= toSpacedLabel(rel.otherEntityNamePascalCase) %> </th>
                 <td mat-cell *matCellDef="let element">
                   <button mat-icon-button (click)="show<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Show <%= rel.otherEntityNamePascalCase %>">
                     <mat-icon svgIcon="file"></mat-icon>
@@ -137,49 +140,53 @@ const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyT
               </ng-container>
               <% }); %>
 <!-- Audit Columns -->
-<ng-container matColumnDef=\"createdBy\">
-  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]=\"'createdBy'\" tableId=\"<%= toKebabCase(entity.name) %>\">CreatedBy</th>
-  <td mat-cell *matCellDef=\"let element\">
-    <span class="text-blue-600 dark:text-blue-400 font-medium" [innerHTML]=\"highlightText(element.createdBy, searchBy === 'createdBy' ? searchTerm : '')\"></span>
+<ng-container matColumnDef="createdBy">
+  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'createdBy'" tableId="<%= toKebabCase(entity.name) %>">Created By</th>
+  <td mat-cell *matCellDef="let element">
+    <span class="text-blue-600 dark:text-blue-400 font-medium" [innerHTML]="highlightText(element.createdBy, searchBy === 'createdBy' ? searchTerm : '')"></span>
   </td>
 </ng-container>
 
-<ng-container matColumnDef=\"createdDate\">
-  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]=\"'createdDate'\" tableId=\"<%= toKebabCase(entity.name) %>\">CreatedDate</th>
-  <td mat-cell *matCellDef=\"let element\">
+<ng-container matColumnDef="createdDate">
+  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'createdDate'" tableId="<%= toKebabCase(entity.name) %>">Created Date</th>
+  <td mat-cell *matCellDef="let element">
     <span class="text-slate-500 dark:text-slate-400">{{ element.createdDate?.toDate() | date: 'medium' }}</span>
   </td>
 </ng-container>
 
-<ng-container matColumnDef=\"lastModifiedBy\">
-  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]=\"'lastModifiedBy'\" tableId=\"<%= toKebabCase(entity.name) %>\">LastModifiedBy</th>
-  <td mat-cell *matCellDef=\"let element\">
-    <span class="text-indigo-600 dark:text-indigo-400 font-medium" [innerHTML]=\"highlightText(element.lastModifiedBy, searchBy === 'lastModifiedBy' ? searchTerm : '')\"></span>
+<ng-container matColumnDef="lastModifiedBy">
+  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'lastModifiedBy'" tableId="<%= toKebabCase(entity.name) %>">Last Modified By</th>
+  <td mat-cell *matCellDef="let element">
+    <span class="text-indigo-600 dark:text-indigo-400 font-medium" [innerHTML]="highlightText(element.lastModifiedBy, searchBy === 'lastModifiedBy' ? searchTerm : '')"></span>
   </td>
 </ng-container>
 
-<ng-container matColumnDef=\"lastModifiedDate\">
-  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]=\"'lastModifiedDate'\" tableId=\"<%= toKebabCase(entity.name) %>\">LastModifiedDate</th>
-  <td mat-cell *matCellDef=\"let element\">
+<ng-container matColumnDef="lastModifiedDate">
+  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'lastModifiedDate'" tableId="<%= toKebabCase(entity.name) %>">Last Modified Date</th>
+  <td mat-cell *matCellDef="let element">
     <span class="text-slate-500 dark:text-slate-400">{{ element.lastModifiedDate?.toDate() | date: 'medium' }}</span>
   </td>
 </ng-container>
               <!-- General Actions Column (Edit/Delete) -->
                 <ng-container matColumnDef="actions" stickyEnd>
-                  <th mat-header-cell cdkDrag *matHeaderCellDef class="!bg-white dark:!bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 font-semibold text-primary whitespace-nowrap">Actions</th>
-                  <td mat-cell *matCellDef="let element" class="!bg-white dark:!bg-neutral-900 group-hover:!bg-neutral-50 dark:group-hover:!bg-neutral-800/30 border-l border-neutral-200 dark:border-neutral-800 whitespace-nowrap" [ngClass]="getStickyClass(element)">
-                    <button mat-icon-button (click)="viewDetails(element.id)" matTooltip="View Details">
-                      <mat-icon svgIcon="eye"></mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="openFormDrawer(element.id)" matTooltip="Edit <%= entity.name %>">
-                      <mat-icon svgIcon="square-pen"></mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="delete(element.id)" matTooltip="Delete <%= entity.name %>">
-                      <mat-icon class="text-warn" svgIcon="trash"></mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="toggleActive(element)" matTooltip="{{element.isActive ? 'Deactivate' : 'Activate'}}">
-                      <mat-icon svgIcon="{{element.isActive ? 'toggle-right' : 'toggle-left'}}" class="{{element.isActive ? 'text-green-500' : 'text-gray-500'}}"></mat-icon>
-                    </button>
+                  <th mat-header-cell *matHeaderCellDef class="!bg-white dark:!bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 font-semibold text-primary whitespace-nowrap z-100" [class.shadow-left]="isActionsShadowVisible">Actions</th>
+                  <td mat-cell *matCellDef="let element" class="!bg-white dark:!bg-neutral-900 group-hover:!bg-neutral-50 dark:group-hover:!bg-neutral-800/30 border-l border-neutral-200 dark:border-neutral-800 whitespace-nowrap" [ngClass]="getStickyClass(element)" [class.shadow-left]="isActionsShadowVisible">
+                    <div class="flex items-center justify-center gap-0.5">
+                      <button mat-icon-button class="h-8 w-8 flex items-center justify-center" (click)="viewDetails(element.id)" matTooltip="View Details">
+                        <mat-icon svgIcon="eye"></mat-icon>
+                      </button>
+                      <button mat-icon-button class="h-8 w-8 flex items-center justify-center" (click)="openFormDrawer(element.id)" matTooltip="Edit <%= entity.name %>">
+                        <mat-icon svgIcon="square-pen"></mat-icon>
+                      </button>
+                      <button mat-icon-button class="h-8 w-8 flex items-center justify-center" (click)="delete(element.id)" matTooltip="Delete <%= entity.name %>">
+                        <mat-icon class="text-warn" svgIcon="trash"></mat-icon>
+                      </button>
+                      <% if (entity.fields.some(f => f.fieldName === 'isActive')) { %>
+                      <button mat-icon-button class="h-8 w-8 flex items-center justify-center" (click)="toggleActive(element)" matTooltip="{{element.isActive ? 'Deactivate' : 'Activate'}}">
+                        <mat-icon svgIcon="{{element.isActive ? 'toggle-right' : 'toggle-left'}}" class="{{element.isActive ? 'text-green-500' : 'text-gray-500'}}"></mat-icon>
+                      </button>
+                      <% } %>
+                    </div>
                   </td>
                 </ng-container>
 

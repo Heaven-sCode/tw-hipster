@@ -1,0 +1,30 @@
+.mat-mdc-header-row {
+  background: var(--mat-sys-surface-bright) !important;
+}
+.mat-mdc-header-cell {
+  background: var(--mat-sys-surface-bright) !important;
+  z-index: 10 !important;
+  border-bottom: 1px solid var(--mat-sys-outline-variant) !important;
+}
+th.shadow-left {
+  z-index: 15 !important;
+  box-shadow: -8px 0 12px -6px rgba(0, 0, 0, 0.15) !important;
+}
+td.shadow-left {
+  z-index: 5 !important;
+  box-shadow: -8px 0 12px -6px rgba(0, 0, 0, 0.15) !important;
+}
+@media (prefers-color-scheme: dark) {
+  th.shadow-left, td.shadow-left {
+    box-shadow: -8px 0 12px -6px rgba(0, 0, 0, 0.45) !important;
+  }
+}
+tr:nth-child(even):not(.has-flag) {
+  background: var(--mat-sys-surface-container-low) !important;
+}
+tr:nth-child(odd):not(.has-flag) {
+  background: var(--mat-sys-surface-bright) !important;
+}
+.sticky-actions-default {
+  background: inherit !important;
+}
