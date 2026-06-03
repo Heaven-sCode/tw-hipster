@@ -8,10 +8,13 @@
       </mat-select>
     </mat-form-field>
 
-    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full xl:w-64">
-      <mat-icon matPrefix svgIcon="search" class="text-neutral-500 mr-2"></mat-icon>
-      <input matInput placeholder="Search…" [ngModel]="searchTerm" (ngModelChange)="onSearchTermChange($event)" />
-    </mat-form-field>
+<mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full xl:w-64">
+  <mat-icon matPrefix svgIcon="search" class="text-neutral-500 mr-2"></mat-icon>
+  <input matInput placeholder="Search…" [ngModel]="searchTerm" (ngModelChange)="onSearchTermChange($event)" />
+  <button mat-icon-button matSuffix type="button" (click)="onSearchTermChange('')" *ngIf="searchTerm" class="h-8 w-8 min-w-0 p-0 flex items-center justify-center">
+    <mat-icon svgIcon="x" class="text-neutral-500"></mat-icon>
+  </button>
+</mat-form-field>
 
   <div class="search-bar col-span-2 flex items-center gap-3 justify-between xl:justify-start">
     
