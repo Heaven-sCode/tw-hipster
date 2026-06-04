@@ -241,14 +241,17 @@ const estimateHeaderWidth = (label) => {
       </div>
 
       <button
-        mat-fab
+        mat-flat-button
         color="primary"
         type="button"
-        class="fixed bottom-6 right-6 z-40 shadow-lg"
+        class="fixed bottom-6 right-6 z-40 h-12 rounded-full px-4 shadow-lg"
         [matMenuTriggerFor]="exportMenu"
         [disabled]="isLoading || isExporting"
         matTooltip="{{ isExporting ? 'Exporting...' : 'Export options' }}">
-        <mat-icon svgIcon="download"></mat-icon>
+        <span class="flex items-center justify-center gap-2">
+          <mat-icon svgIcon="download" class="m-0"></mat-icon>
+         
+        </span>
       </button>
     </div>
   </mat-drawer-content>
