@@ -24,6 +24,7 @@ export class ResizableDirective implements OnInit, OnDestroy {
 
   private mouseMoveListener?: () => void;
   private mouseUpListener?: () => void;
+  private mouseDownListener?: () => void;
   private startX = 0;
   private startWidth = 0;
 
@@ -33,31 +34,41 @@ export class ResizableDirective implements OnInit, OnDestroy {
     // Apply any persisted width.
     const saved = this.getSavedWidth();
     if (saved) {
-      this.renderer.setStyle(this.el.nativeElement, 'width', `${saved}px`);
+      this.applyWidth(saved);
     }
     // Ensure the element is positioned correctly for resizing.
     this.renderer.setStyle(this.el.nativeElement, 'position', 'relative');
+    this.renderer.setStyle(this.el.nativeElement, 'overflow', 'visible');
+    this.renderer.setStyle(this.el.nativeElement, 'box-sizing', 'border-box');
     // Add a resize handle.
     const handle = this.renderer.createElement('span');
     this.renderer.addClass(handle, 'resize-handle');
     this.renderer.setStyle(handle, 'position', 'absolute');
-    this.renderer.setStyle(handle, 'right', '0');
+    this.renderer.setStyle(handle, 'right', '-3px');
     this.renderer.setStyle(handle, 'top', '0');
     this.renderer.setStyle(handle, 'bottom', '0');
-    this.renderer.setStyle(handle, 'width', '4px');
+    this.renderer.setStyle(handle, 'width', '10px');
     this.renderer.setStyle(handle, 'cursor', 'col-resize');
     this.renderer.setStyle(handle, 'user-select', 'none');
+    this.renderer.setStyle(handle, 'touch-action', 'none');
+    this.renderer.setStyle(handle, 'z-index', '10');
+    this.renderer.setStyle(handle, 'background', 'transparent');
     this.renderer.appendChild(this.el.nativeElement, handle);
     // Listen for mousedown on the handle.
-    this.renderer.listen(handle, 'mousedown', (event: MouseEvent) => this.onMouseDown(event));
+    this.mouseDownListener = this.renderer.listen(handle, 'mousedown', (event: MouseEvent) => this.onMouseDown(event));
   }
 
   ngOnDestroy(): void {
     this.unbindDocumentEvents();
+    if (this.mouseDownListener) {
+      this.mouseDownListener();
+      this.mouseDownListener = undefined;
+    }
   }
 
   private onMouseDown(event: MouseEvent): void {
     event.preventDefault();
+    event.stopPropagation();
     this.startX = event.pageX;
     this.startWidth = this.el.nativeElement.offsetWidth;
     // Bind move/up listeners on the document so we capture events even if the
@@ -67,9 +78,10 @@ export class ResizableDirective implements OnInit, OnDestroy {
   }
 
   private onMouseMove(event: MouseEvent): void {
+    event.preventDefault();
     const delta = event.pageX - this.startX;
-    const newWidth = Math.max(this.startWidth + delta, 30); // enforce a sensible minimum
-    this.renderer.setStyle(this.el.nativeElement, 'width', `${newWidth}px`);
+    const newWidth = Math.max(this.startWidth + delta, 60);
+    this.applyWidth(newWidth);
   }
 
   private onMouseUp(): void {
@@ -105,5 +117,15 @@ export class ResizableDirective implements OnInit, OnDestroy {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(this.storageKey(), width.toString());
   }
-}
 
+  private applyWidth(width: number): void {
+    const px = `${width}px`;
+    this.renderer.setStyle(this.el.nativeElement, 'width', px);
+    this.renderer.setStyle(this.el.nativeElement, 'min-width', px);
+    this.renderer.setStyle(this.el.nativeElement, 'max-width', px);
+    const table = this.el.nativeElement.closest('table');
+    if (table) {
+      this.renderer.setStyle(table, 'table-layout', 'fixed');
+    }
+  }
+}
