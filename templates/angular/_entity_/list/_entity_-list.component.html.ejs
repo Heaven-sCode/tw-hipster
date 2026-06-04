@@ -62,7 +62,7 @@ const estimateHeaderWidth = (label) => {
               <mat-progress-spinner [diameter]="40" [mode]="'indeterminate'"></mat-progress-spinner>
             </div>
 
-            <div #tableWrapper class="-m-6 min-h-0 flex-auto overflow-auto sm:-m-10" *ngIf="!isLoading" (scroll)="onTableScroll()" cdkScrollable>
+            <div #tableWrapper class="-m-6 min-h-0 flex-auto overflow-auto pb-[100px] sm:-m-10" *ngIf="!isLoading" (scroll)="onTableScroll()" cdkScrollable>
               <table
                 mat-table
                 [dataSource]="dataSource"
@@ -244,7 +244,7 @@ const estimateHeaderWidth = (label) => {
         mat-fab
         color="primary"
         type="button"
-        class="fixed bottom-6 right-6 z-20 shadow-lg"
+        class="fixed bottom-6 right-6 z-40 shadow-lg"
         [matMenuTriggerFor]="exportMenu"
         [disabled]="isLoading || isExporting"
         matTooltip="{{ isExporting ? 'Exporting...' : 'Export options' }}">
@@ -291,16 +291,13 @@ const estimateHeaderWidth = (label) => {
   </mat-menu>
 
   <mat-menu #flagMenu="matMenu">
-    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full xl:w-64">
-      <mat-icon matPrefix svgIcon="search" class="text-neutral-500 mr-2"></mat-icon>
-      <input matInput placeholder="Search…" [ngModel]="searchTerm" (ngModelChange)="onSearchTermChange($event)" />
-      <button mat-icon-button matSuffix type="button" (click)="onSearchTermChange('')" *ngIf="searchTerm" class="h-8 w-8 min-w-0 p-0 flex items-center justify-center">
-        <mat-icon svgIcon="x" class="text-neutral-500"></mat-icon>
-      </button>
-    </mat-form-field>
     <button mat-menu-item type="button" *ngFor="let option of rowFlagOptions" (click)="setFlagColor(option.key)">
       <mat-icon svgIcon="flag" class="mr-3" [ngClass]="option.iconClass"></mat-icon>
       <span>{{ option.label }}</span>
+    </button>
+    <button mat-menu-item type="button" (click)="setFlagColor(null)">
+      <mat-icon svgIcon="x" class="mr-3 text-neutral-500"></mat-icon>
+      <span>Clear Flag</span>
     </button>
   </mat-menu>
 
