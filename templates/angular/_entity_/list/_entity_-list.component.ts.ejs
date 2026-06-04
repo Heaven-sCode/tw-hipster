@@ -284,6 +284,10 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   ];
 
   // --- Table & Drawer ---
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild('filterDrawer') filterDrawer!: MatDrawer;
+  @ViewChild('formDrawer') formDrawer!: MatDrawer;
   @ViewChild('tableWrapper') tableWrapper!: ElementRef<HTMLElement>;
   isActionsShadowVisible = false;
   readonly storageKeyPageSize = '<%= toKebabCase(entity.name) %>-page-size';
