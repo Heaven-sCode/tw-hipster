@@ -84,6 +84,8 @@ function relationshipFilterKey(rel) {
   const base = rel.from.fieldName ? toCamelCase(rel.from.fieldName) : toCamelCase(rel.otherEntityName);
   return base.endsWith('Id') ? base : `${base}Id`;
 }
+
+const auditFieldNames = ['createdBy', 'createdDate', 'lastModifiedBy', 'lastModifiedDate'];
 %>
 <%- Array.from(relationshipComponentImports.values()).map(entry => entry.listImport).join('\n') %>
 <%- Array.from(relationshipComponentImports.values()).map(entry => entry.formImport).join('\n') %>
@@ -208,7 +210,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
 
   // --- State & Triggers ---
   viewMode: 'table' | 'card' = 'table';
-  isLoading = true;
+  isLoading = false;
   isExporting = false;
   totalItems = 0;
   itemsPerPage = 10;
@@ -256,7 +258,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
 
   // --- Filter configuration ---
   filterFields: FilterField[] = [
-    <% entity.fields.forEach(field => { 
+    <% entity.fields.forEach(field => {
          const valueType = getFilterValueType(field.fieldType, field.fieldTypeIsEnum);
          const enumOptionsKey = field.fieldTypeIsEnum ? `${toCamelCase(field.fieldType)}Options` : null;
     %>
@@ -295,8 +297,16 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   readonly allColumnPreferences: TableColumnPreference[] = [
     { key: 'state', label: 'State', alwaysVisible: true },
     { key: 'id', label: 'ID' },
-    <% entity.fields.forEach(field => { %>{ key: '<%= field.fieldName %>', label: '<%= toSpacedLabel(field.fieldName) %>' },
+    <% entity.fields.filter(field => !auditFieldNames.includes(field.fieldName)).forEach(field => { %>{ key: '<%= field.fieldName %>', label: '<%= toSpacedLabel(field.fieldName) %>' },
     <% }); %>
+    <% if (entity.fields.some(field => field.fieldName === 'createdBy')) { %>{ key: 'createdBy', label: 'Created By' },
+    <% } %>
+    <% if (entity.fields.some(field => field.fieldName === 'createdDate')) { %>{ key: 'createdDate', label: 'Created Date' },
+    <% } %>
+    <% if (entity.fields.some(field => field.fieldName === 'lastModifiedBy')) { %>{ key: 'lastModifiedBy', label: 'Last Modified By' },
+    <% } %>
+    <% if (entity.fields.some(field => field.fieldName === 'lastModifiedDate')) { %>{ key: 'lastModifiedDate', label: 'Last Modified Date' },
+    <% } %>
 
     <% collectionRelationships.forEach(rel => { %>{ key: 'actions-<%= rel.otherEntityName %>', label: '<%= toSpacedLabel(rel.otherEntityNamePascalCase) %>' },
     <% }); %>
