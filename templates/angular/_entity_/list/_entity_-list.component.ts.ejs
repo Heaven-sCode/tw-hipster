@@ -34,6 +34,7 @@ import { <%= entity.name %>FormComponent } from '../form/<%= toKebabCase(entity.
 import { <%= entity.name %>CardComponent } from '../card/<%= toKebabCase(entity.name) %>-card.component';
 import { <%= entity.name %>FilterComponent } from '../filter/<%= toKebabCase(entity.name) %>-filter.component';
 import { <%= entity.name %>ActionsComponent } from '../actions/<%= toKebabCase(entity.name) %>-actions.component';
+import { ResizableDirective } from '../shared/resizable.directive';
 
 <%
 const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyToMany'].includes(rel.type));
@@ -190,6 +191,7 @@ const FILTER_OPERATOR_LIBRARY: { [key in FilterValueType]: FilterFieldOperator[]
     <%= entity.name %>CardComponent,
     <%= entity.name %>FilterComponent,
     <%= entity.name %>ActionsComponent,
+    ResizableDirective,
   ],
   templateUrl: './<%= toKebabCase(entity.name) %>-list.component.html',
   host: {
