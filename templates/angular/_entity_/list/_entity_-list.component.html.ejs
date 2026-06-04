@@ -48,16 +48,17 @@ const toSpacedLabel = (str) => {
 
       <!-- Main -->
       <div
-        class="bg-card -mt-16 flex-auto overflow-y-auto rounded-t-2xl p-6 shadow sm:p-10"
+        class="bg-card -mt-16 flex min-h-0 flex-auto flex-col overflow-hidden rounded-t-2xl shadow"
         cdkScrollable
       >
+        <div class="flex min-h-0 flex-1 flex-col p-6 sm:p-10">
           <!-- Table View -->
           @if (viewMode === 'table') {
             <div *ngIf="isLoading" class="flex items-center justify-center p-8">
               <mat-progress-spinner [diameter]="40" [mode]="'indeterminate'"></mat-progress-spinner>
             </div>
 
-            <div #tableWrapper class="-m-6 overflow-auto flex-auto sm:-m-10 min-h-[520px] pb-[100px]" *ngIf="!isLoading" (scroll)="onTableScroll()" cdkScrollable>
+            <div #tableWrapper class="-m-6 min-h-0 flex-auto overflow-auto sm:-m-10" *ngIf="!isLoading" (scroll)="onTableScroll()" cdkScrollable>
               <table
                 mat-table
                 [dataSource]="dataSource"
@@ -214,23 +215,26 @@ const toSpacedLabel = (str) => {
             <div *ngIf="isLoading" class="flex items-center justify-center p-8">
               <mat-progress-spinner [diameter]="40" [mode]="'indeterminate'"></mat-progress-spinner>
             </div>
-            <div *ngIf="!isLoading" class="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              <app-<%= toKebabCase(entity.name) %>-card *ngFor="let element of dataSource.data" [item]="element" [searchTerm]="searchTerm" [searchBy]="searchBy" [pinned]="isPinned(element.id)" [flagClass]="getFlagClass(element.id)" class="block"></app-<%= toKebabCase(entity.name) %>-card>
-            </div>
-            <div *ngIf="!isLoading && !dataSource.data.length" class="p-8 text-center text-neutral-500">
-              No data found.
+            <div *ngIf="!isLoading" class="-m-6 min-h-0 flex-auto overflow-y-auto sm:-m-10">
+              <div class="grid grid-cols-1 gap-6 p-6 sm:grid-cols-2 sm:p-10 md:grid-cols-3 lg:grid-cols-4">
+                <app-<%= toKebabCase(entity.name) %>-card *ngFor="let element of dataSource.data" [item]="element" [searchTerm]="searchTerm" [searchBy]="searchBy" [pinned]="isPinned(element.id)" [flagClass]="getFlagClass(element.id)" class="block"></app-<%= toKebabCase(entity.name) %>-card>
+              </div>
+              <div *ngIf="!dataSource.data.length" class="p-8 text-center text-neutral-500">
+                No data found.
+              </div>
             </div>
           }
-      </div>
+        </div>
 
-      <!-- Paginator (locked at bottom, never scrolls) -->
-      <mat-paginator
-        class="flex-0 shrink-0 border-t border-neutral-200 bg-card [&_.mat-mdc-paginator-container]:justify-start"
-        [length]="totalItems"
-        [pageSize]="itemsPerPage"
-        [pageSizeOptions]="[10, 25, 50, 100]"
-        (page)="loadData()"
-      ></mat-paginator>
+        <!-- Paginator (sticky at bottom of the scroll panel) -->
+        <mat-paginator
+          class="sticky bottom-0 z-10 flex-0 shrink-0 border-t border-neutral-200 bg-card [&_.mat-mdc-paginator-container]:justify-start"
+          [length]="totalItems"
+          [pageSize]="itemsPerPage"
+          [pageSizeOptions]="[10, 25, 50, 100]"
+          (page)="loadData()"
+        ></mat-paginator>
+      </div>
 
       <button
         mat-fab
