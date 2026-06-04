@@ -23,7 +23,7 @@ const toSpacedLabel = (str) => {
     <div class="absolute inset-0 flex min-w-0 flex-col overflow-hidden">
 
       <!-- Header (fixed, does not scroll) -->
-      <div class="bg-default dark:bg-transparent flex flex-0 flex-col p-6 pb-22 xl:flex-row xl:items-center xl:justify-between xl:px-10 xl:pb-28 xl:pt-12">
+      <div class="flex flex-0 flex-col border-b border-slate-200 bg-slate-100 p-6 pb-22 xl:flex-row xl:items-center xl:justify-between xl:px-10 xl:pb-28 xl:pt-12 dark:border-slate-800 dark:bg-slate-900/60">
         <div class="min-w-0 flex-1">
           <h2 class="truncate text-3xl font-extrabold leading-7 tracking-tight sm:leading-10 md:text-4xl">
             <%= entity.name.replace(/([A-Z])/g, ' $1').trim() %> Management
@@ -48,7 +48,7 @@ const toSpacedLabel = (str) => {
 
       <!-- Main -->
       <div
-        class="bg-card -mt-16 flex min-h-0 flex-auto flex-col overflow-hidden rounded-t-2xl shadow"
+        class="-mt-16 flex min-h-0 flex-auto flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow dark:border-slate-800 dark:bg-neutral-950"
         cdkScrollable
       >
         <div class="flex min-h-0 flex-1 flex-col p-6 sm:p-10">
