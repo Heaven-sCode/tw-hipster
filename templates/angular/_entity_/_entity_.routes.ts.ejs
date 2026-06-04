@@ -13,12 +13,4 @@ export default [
   { path: ':id/card', component: <%= entity.name %>CardComponent },
   { path: ':id/edit', component: <%= entity.name %>FormPageComponent },
   { path: 'new', component: <%= entity.name %>FormPageComponent },
-  <% relationships.forEach(rel => { %>
-  // Route to show children of this entity
-  // e.g., /customers/:customerId/orders
-  {
-    path: ':<%= toCamelCase(entity.name) %>Id/<%= toKebabCase(rel.otherEntityNamePlural) %>',
-    loadComponent: () => import('../<%= toKebabCase(rel.otherEntityName) %>/list/<%= toKebabCase(rel.otherEntityName) %>-list.component').then(m => m.<%= rel.otherEntityNamePascalCase %>ListComponent),
-  },
-  <% }); %>
 ] as Routes;
