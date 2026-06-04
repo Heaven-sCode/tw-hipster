@@ -5,7 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { CdkScrollable } from '@angular/cdk/scrolling';
-import { merge, of, startWith, Subject, catchError, switchMap, tap, finalize } from 'rxjs';
+import { merge, of, startWith, Subject, catchError, switchMap, tap, finalize, map } from 'rxjs';
 import dayjs from 'dayjs/esm';
 
 // Angular Material & Fuse
@@ -26,6 +26,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 // Application Imports
 import { I<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
@@ -187,6 +188,7 @@ const FILTER_OPERATOR_LIBRARY: { [key in FilterValueType]: FilterFieldOperator[]
     MatDatepickerModule,
     MatNativeDateModule,
     MatSlideToggleModule, FormsModule,
+    MatSnackBarModule,
     <%= entity.name %>FormComponent,
     <%= entity.name %>CardComponent,
     <%= entity.name %>FilterComponent,
@@ -208,12 +210,14 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   private readonly dialogRef = inject(MatDialogRef<<%= entity.name %>ListComponent>, { optional: true });
   private readonly dialogData = inject(MAT_DIALOG_DATA, { optional: true }) as ParentDialogData | null;
   private readonly confirmationService = inject(FuseConfirmationService);
+  private readonly snackBar = inject(MatSnackBar);
   private readonly cdr = inject(ChangeDetectorRef);
 
   // --- State & Triggers ---
   viewMode: 'table' | 'card' = 'table';
   isLoading = false;
   isExporting = false;
+  exportAfterFilter = false;
   totalItems = 0;
   itemsPerPage = 10;
   private readonly refreshTrigger = new Subject<void>();
@@ -316,6 +320,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   ];
   displayedColumns: string[] = [];
   dataSource = new MatTableDataSource<I<%= entity.name %>>();
+  skeletonData = Array.from({ length: 20 }, () => ({} as I<%= entity.name %>));
 
   ngOnInit(): void {
     if (typeof window !== 'undefined' && window.innerWidth < 640) {
@@ -487,6 +492,13 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     this.filterDrawer.close();
   }
 
+  handleFilterDrawerClosed(): void {
+    if (this.exportAfterFilter) {
+      this.exportAfterFilter = false;
+    }
+    this.closeFilterDrawer();
+  }
+
   handleFormSaved(): void {
     this.closeFormDrawer();
     this.refreshTrigger.next();
@@ -517,17 +529,26 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     this.refreshTrigger.next();
     this.loadData();
     this.closeFilterDrawer();
+
+    if (this.exportAfterFilter) {
+      this.exportAfterFilter = false;
+      this.exportDataForFilters({
+        ...this.baseParentFilters,
+        ...filters,
+      });
+    }
   }
 
   exportFilteredData(): void {
-    this.exportData({
-      ...this.baseParentFilters,
-      ...this.activeFilters,
+    this.exportAfterFilter = true;
+    this.openFilterDrawer();
+    this.snackBar.open('Please apply filters in the drawer to export the filtered data.', 'Dismiss', {
+      duration: 4000,
     });
   }
 
   exportAllData(): void {
-    this.exportData({});
+    this.exportDataForFilters({});
   }
 
   <% collectionRelationships.forEach(rel => { 
@@ -561,28 +582,37 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     });
   }
   <% }); %>
-
-
-
-  private exportData(filters: { [key: string]: string | number }): void {
+  private exportDataForFilters(filters: { [key: string]: string | number }): void {
     this.isExporting = true;
-    const exportReq = {
-      page: 0,
-      size: this.totalItems > 0 ? this.totalItems : 1000,
-      sort: this.getSortParameters(),
-      ...filters,
-    };
-
-    this.<%= toCamelCase(entity.name) %>Service.query(exportReq).pipe(
+    this.fetchExportTotal(filters).pipe(
+      switchMap(total => {
+        const exportReq = {
+          page: 0,
+          size: total > 0 ? total : 1000,
+          sort: this.getSortParameters(),
+          ...filters,
+        };
+        return this.<%= toCamelCase(entity.name) %>Service.query(exportReq);
+      }),
       tap(response => {
-        const rows = response.body ?? [];
-        this.downloadCsv(rows);
+        this.downloadCsv(response.body ?? []);
       }),
       catchError(() => of(null)),
       finalize(() => {
         this.isExporting = false;
       })
     ).subscribe();
+  }
+
+  private fetchExportTotal(filters: { [key: string]: string | number }) {
+    return this.<%= toCamelCase(entity.name) %>Service.query({
+      page: 0,
+      size: 1,
+      sort: this.getSortParameters(),
+      ...filters,
+    }).pipe(
+      map(response => Number(response.headers.get('X-Total-Count') ?? 0))
+    );
   }
 
   private restoreColumnPreferences(): void {

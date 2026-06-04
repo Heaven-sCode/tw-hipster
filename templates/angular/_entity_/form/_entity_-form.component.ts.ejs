@@ -108,6 +108,7 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
     request$.pipe(finalize(() => (this.isSaving = false))).subscribe({
       next: response => {
         if (response.body) {
+          this.resetToDefaults();
           this.saved.emit(response.body);
           this.dialogRef?.close(response.body);
         }
@@ -137,5 +138,13 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
     } else {
       this.formService.resetForm(this.form, { id: null, ...defaults } as Partial<New<%= entity.name %>>);
     }
+  }
+
+  private resetToDefaults(): void {
+    this.entity = null;
+    const defaults = this.dialogData?.defaults ?? {};
+    this.formService.resetForm(this.form, { id: null, ...defaults } as Partial<New<%= entity.name %>>);
+    this.form.markAsPristine();
+    this.form.markAsUntouched();
   }
 }
