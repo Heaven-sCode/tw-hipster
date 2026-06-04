@@ -1,6 +1,7 @@
 <!-- This is an EJS template. It generates the HTML for the list component. -->
 <%
 const collectionRelationships = relationships.filter(rel => ['OneToMany', 'ManyToMany'].includes(rel.type));
+const auditFieldNames = ['createdBy', 'createdDate', 'lastModifiedBy', 'lastModifiedDate'];
 const toSpacedLabel = (str) => {
   return str.replace(/([A-Z])/g, ' $1').trim().replace(/^./, c => c.toUpperCase());
 };
@@ -100,7 +101,7 @@ const toSpacedLabel = (str) => {
                   </div>
                 </td>
               </ng-container>
-              <% entity.fields.forEach(field => { %>
+              <% entity.fields.filter(field => !auditFieldNames.includes(field.fieldName)).forEach(field => { %>
               <ng-container matColumnDef="<%= field.fieldName %>">
                 <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'<%= field.fieldName %>'" tableId="<%= toKebabCase(entity.name) %>"><%= toSpacedLabel(field.fieldName) %></th>
                 <% if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>
@@ -140,33 +141,41 @@ const toSpacedLabel = (str) => {
               </ng-container>
               <% }); %>
 <!-- Audit Columns -->
+<% if (entity.fields.some(field => field.fieldName === 'createdBy')) { %>
 <ng-container matColumnDef="createdBy">
   <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'createdBy'" tableId="<%= toKebabCase(entity.name) %>">Created By</th>
   <td mat-cell *matCellDef="let element">
     <span class="text-blue-600 dark:text-blue-400 font-medium" [innerHTML]="highlightText(element.createdBy, searchBy === 'createdBy' ? searchTerm : '')"></span>
   </td>
 </ng-container>
+<% } %>
 
+<% if (entity.fields.some(field => field.fieldName === 'createdDate')) { %>
 <ng-container matColumnDef="createdDate">
   <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'createdDate'" tableId="<%= toKebabCase(entity.name) %>">Created Date</th>
   <td mat-cell *matCellDef="let element">
     <span class="text-slate-500 dark:text-slate-400">{{ element.createdDate?.toDate() | date: 'medium' }}</span>
   </td>
 </ng-container>
+<% } %>
 
+<% if (entity.fields.some(field => field.fieldName === 'lastModifiedBy')) { %>
 <ng-container matColumnDef="lastModifiedBy">
   <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'lastModifiedBy'" tableId="<%= toKebabCase(entity.name) %>">Last Modified By</th>
   <td mat-cell *matCellDef="let element">
     <span class="text-indigo-600 dark:text-indigo-400 font-medium" [innerHTML]="highlightText(element.lastModifiedBy, searchBy === 'lastModifiedBy' ? searchTerm : '')"></span>
   </td>
 </ng-container>
+<% } %>
 
+<% if (entity.fields.some(field => field.fieldName === 'lastModifiedDate')) { %>
 <ng-container matColumnDef="lastModifiedDate">
   <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'lastModifiedDate'" tableId="<%= toKebabCase(entity.name) %>">Last Modified Date</th>
   <td mat-cell *matCellDef="let element">
     <span class="text-slate-500 dark:text-slate-400">{{ element.lastModifiedDate?.toDate() | date: 'medium' }}</span>
   </td>
 </ng-container>
+<% } %>
               <!-- General Actions Column (Edit/Delete) -->
                 <ng-container matColumnDef="actions" stickyEnd>
                   <th mat-header-cell *matHeaderCellDef class="!bg-white dark:!bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 font-semibold text-primary whitespace-nowrap z-100" [class.shadow-left]="isActionsShadowVisible">Actions</th>

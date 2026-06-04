@@ -7,7 +7,8 @@ import { Directive, ElementRef, Input, OnInit, OnDestroy, Renderer2 } from '@ang
 
 @Directive({
   selector: '[appResizable]',
-  exportAs: 'appResizable'
+  exportAs: 'appResizable',
+  standalone: true
 })
 export class ResizableDirective implements OnInit, OnDestroy {
   /**
@@ -106,12 +107,3 @@ export class ResizableDirective implements OnInit, OnDestroy {
   }
 }
 
-/*
-  Minimal CSS required for the resize handle. In a real project this would be
-  placed in a global stylesheet or component‑scoped stylesheet. The directive
-  adds the `resize-handle` class, so make sure the styles exist:
-
-  .resize-handle {
-    background: transparent; /* invisible but still hits mouse events */
-  }
-*/

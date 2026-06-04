@@ -384,6 +384,8 @@ async function generateEntityFiles(config, entity, allRelationships) {
         // Existing drawer form component
         { template: '_entity_-form.component.ts.ejs', subfolder: 'form', outputPattern: '<%= entityName %>-form.component.ts' },
         { template: '_entity_-form.component.html.ejs', subfolder: 'form', outputPattern: '<%= entityName %>-form.component.html' },
+        // Shared directive used by generated list templates
+        { template: 'resizable.directive.ts', subfolder: 'shared', outputPattern: 'resizable.directive.ts' },
         { template: '_entity_-list.component.ts.ejs', subfolder: 'list',   outputPattern: '<%= entityName %>-list.component.ts' },
         { template: '_entity_-list.component.html.ejs', subfolder: 'list',   outputPattern: '<%= entityName %>-list.component.html' },
         { template: '_entity_-list.component.scss.ejs', subfolder: 'list',   outputPattern: '<%= entityName %>-list.component.scss' },
