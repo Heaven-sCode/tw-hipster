@@ -90,7 +90,7 @@ function relationshipFilterKey(rel) {
 <%- Array.from(uniqueEnumImports.values()).join('\n') %>
 
 type ParentDialogData = {
-  parentFilters?: Record<string, string | number>;
+  parentFilters?: { [key: string]: string | number };
 };
 
 type FilterValueType = 'string' | 'number' | 'date' | 'boolean' | 'enum';
@@ -129,7 +129,7 @@ interface RowFlagOption {
   iconClass: string;
 }
 
-const FILTER_OPERATOR_LIBRARY: Record<FilterValueType, FilterFieldOperator[]> = {
+const FILTER_OPERATOR_LIBRARY: { [key in FilterValueType]: FilterFieldOperator[] } = {
   string: [
     { key: 'contains', label: 'Contains', requiresValue: true, valueType: 'string' },
     { key: 'equals', label: 'Equals', requiresValue: true, valueType: 'string' },
@@ -213,8 +213,8 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   totalItems = 0;
   itemsPerPage = 10;
   private readonly refreshTrigger = new Subject<void>();
-  private baseParentFilters: Record<string, string | number> = {};
-  protected activeFilters: Record<string, string> = {};
+  private baseParentFilters: { [key: string]: string | number } = {};
+  protected activeFilters: { [key: string]: string } = {};
   private readonly columnPreferenceStorageKey = '<%= toKebabCase(entity.name) %>-list-column-preferences';
 
   selected<%= entity.name %>: I<%= entity.name %> | null = null;
@@ -225,7 +225,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   searchableColumns: string[] = [<%- entity.fields.map(f => `'${f.fieldName}'`).join(', ') %>];
   pinnedIds: Set<number> = new Set<number>();
   activeFlagRowId: number | null = null;
-  rowFlagColors: Record<number, string> = {};
+  rowFlagColors: { [key: number]: string } = {};
   readonly storageKeySearchTerm = '<%= toKebabCase(entity.name) %>-search-term';
   readonly storageKeySearchBy = '<%= toKebabCase(entity.name) %>-search-by';
   readonly storageKeyPinned = '<%= toKebabCase(entity.name) %>-pinned';
@@ -440,22 +440,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     if (id) {
       this.confirmationService.open({
         title: 'Edit <%= entity.name %>',
-        message: 'Are you sure you want to edit this <%= toCamelCase(entity.name) %>?',
-        icon: {
-          show: true,
-          name: 'heroicons_outline:pencil-square',
-          color: 'info'
-        },
-        actions: {
-          confirm: {
-            label: 'Edit',
-            color: 'primary'
-          },
-          cancel: {
-            label: 'Cancel'
-          }
-        },
-        dismissible: true
+        message: 'Are you sure you want to edit this <%= toCamelCase(entity.name) %>?'
       }).afterClosed().subscribe(result => {
         if (result === 'confirmed') {
           this.drawerMode = 'edit';
@@ -500,21 +485,19 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   delete(id: number): void {
     this.confirmationService.open({
       title: 'Delete <%= entity.name %>',
-      message: 'Are you sure you want to delete this? This action cannot be undone.',
-      icon: 'warning',
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel'
-    }).afterClosed().subscribe(confirmed => {
-      if (!confirmed) {
+      message: 'Are you sure you want to delete this? This action cannot be undone.'
+    }).afterClosed().subscribe(result => {
+      if (result !== 'confirmed') {
         return;
       }
       this.<%= toCamelCase(entity.name) %>Service.delete(id).subscribe(() => {
-      this.refreshTrigger.next();
-      this.loadData();
+        this.refreshTrigger.next();
+        this.loadData();
+      });
     });
   }
 
-  handleFiltersApplied(filters: Record<string, string>): void {
+  handleFiltersApplied(filters: { [key: string]: string }): void {
     this.activeFilters = filters;
     if (this.paginator) {
       this.paginator.firstPage();
@@ -569,7 +552,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
 
 
 
-  private exportData(filters: Record<string, string | number>): void {
+  private exportData(filters: { [key: string]: string | number }): void {
     this.isExporting = true;
     const exportReq = {
       page: 0,
@@ -657,7 +640,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   }
 
   private resolveColumnValue(row: I<%= entity.name %>, columnKey: string): string {
-    const value = (row as Record<string, unknown>)[columnKey];
+    const value = (row as { [key: string]: unknown })[columnKey];
     if (value === null || value === undefined) {
       return '';
     }
@@ -696,6 +679,10 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     }
     this.refreshTrigger.next();
     this.loadData();
+  }
+
+  onSearchTermChange(value: string): void {
+    this.handleSearchChanged({ searchBy: this.searchBy, searchTerm: value });
   }
 
   togglePin(element: I<%= entity.name %>): void {
@@ -760,22 +747,7 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
     
     this.confirmationService.open({
       title: `${actionLabel} <%= entity.name %>`,
-      message: `Are you sure you want to ${newActiveState ? 'activate' : 'deactivate'} this <%= toCamelCase(entity.name) %>?`,
-      icon: {
-        show: true,
-        name: 'heroicons_outline:information-circle',
-        color: newActiveState ? 'success' : 'warn'
-      },
-      actions: {
-        confirm: {
-          label: actionLabel,
-          color: newActiveState ? 'primary' : 'warn'
-        },
-        cancel: {
-          label: 'Cancel'
-        }
-      },
-      dismissible: true
+      message: `Are you sure you want to ${newActiveState ? 'activate' : 'deactivate'} this <%= toCamelCase(entity.name) %>?`
     }).afterClosed().subscribe(result => {
       if (result === 'confirmed') {
         const updated = { ...element, isActive: newActiveState };
