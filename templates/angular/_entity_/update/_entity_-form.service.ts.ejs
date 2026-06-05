@@ -1,36 +1,22 @@
 import { Injectable } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
+import dayjs from 'dayjs/esm';
 import { I<%= entity.name %>, New<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
+
 <%
-function relationshipPropertyName(rel) {
-  const isCollection = ['OneToMany', 'ManyToMany'].includes(rel.type);
-  if (rel.from.fieldName) {
-    return toCamelCase(rel.from.fieldName);
-  }
-  return isCollection ? toCamelCase(rel.otherEntityNamePlural) : toCamelCase(rel.otherEntityName);
-}
-const relationshipsForControls = relationships.filter(rel => rel.type !== 'OneToMany');
-const relationshipImports = new Map();
-relationshipsForControls.forEach(rel => {
-  if (rel.otherEntityName !== entity.name && !relationshipImports.has(rel.otherEntityName)) {
-    relationshipImports.set(
-      rel.otherEntityName,
-      `import { I${rel.otherEntityName} } from '../../${toKebabCase(rel.otherEntityName)}/${toKebabCase(rel.otherEntityName)}.model';`
-    );
-  }
-});
+const dateFields = entity.fields.filter(f => ['LocalDate', 'Instant', 'ZonedDateTime'].includes(f.fieldType));
 %>
-<%- Array.from(relationshipImports.values()).join('\n') %>
 
 type <%= entity.name %>FormGroupInput = I<%= entity.name %> | Partial<New<%= entity.name %>>;
-type <%= entity.name %>FormRawValue = I<%= entity.name %>;
+type <%= entity.name %>FormRawValue = Omit<I<%= entity.name %>, <%- dateFields.length ? dateFields.map(f => `'${f.fieldName}'`).join(' | ') : 'never' %>> & {
+  <% dateFields.forEach(field => { %>
+  <%= field.fieldName %>?: Date | null;
+  <% }); %>
+};
 export type <%= entity.name %>FormGroup = FormGroup<{
   id: FormControl<I<%= entity.name %>['id'] | New<%= entity.name %>['id']>;
   <% entity.fields.forEach(field => { %>
-  <%= field.fieldName %>: FormControl<I<%= entity.name %>['<%= field.fieldName %>']>;
-  <% }); %>
-  <% relationshipsForControls.forEach(rel => { const propertyName = relationshipPropertyName(rel); const isCollection = ['ManyToMany'].includes(rel.type); %>
-  <%= propertyName %>: FormControl<<%= isCollection ? `I${rel.otherEntityName}[]` : `I${rel.otherEntityName}` %> | null>;
+  <%= field.fieldName %>: FormControl<<% if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>Date | null<% } else { %>I<%= entity.name %>['<%= field.fieldName %>']<% } %>>;
   <% }); %>
 }>;
 
@@ -43,26 +29,43 @@ export class <%= entity.name %>FormService {
         { nonNullable: true, validators: [Validators.required] }
       ),
       <% entity.fields.forEach(field => { %>
-      <%= field.fieldName %>: new FormControl(entity.<%= field.fieldName %><% if (field.fieldValidateRules.includes('required')) { %>, Validators.required<% } %>),
-      <% }); %>
-      <% relationshipsForControls.forEach(rel => { const propertyName = relationshipPropertyName(rel); const isCollection = ['ManyToMany'].includes(rel.type); %>
-      <%= propertyName %>: new FormControl(<% if (isCollection) { %>entity.<%= propertyName %> ?? []<% } else { %>entity.<%= propertyName %> ?? null<% } %>),
+      <%= field.fieldName %>: new FormControl(<% if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>this.convertDateForForm(entity.<%= field.fieldName %>)<% } else { %>entity.<%= field.fieldName %><% } %><% if (field.fieldValidateRules.includes('required')) { %>, Validators.required<% } %>),
       <% }); %>
     });
     return form;
   }
 
   get<%= entity.name %>(form: <%= entity.name %>FormGroup): I<%= entity.name %> | New<%= entity.name %> {
-    return form.getRawValue() as I<%= entity.name %> | New<%= entity.name %>;
+    const rawValue = form.getRawValue() as <%= entity.name %>FormRawValue;
+    return {
+      ...rawValue,
+      <% dateFields.forEach(field => { %>
+      <%= field.fieldName %>: rawValue.<%= field.fieldName %> ? dayjs(rawValue.<%= field.fieldName %>) : null,
+      <% }); %>
+    } as I<%= entity.name %> | New<%= entity.name %>;
   }
 
   resetForm(form: <%= entity.name %>FormGroup, entity: <%= entity.name %>FormGroupInput): void {
     form.reset({
       ...entity,
-      <% relationshipsForControls.forEach(rel => { const propertyName = relationshipPropertyName(rel); const isCollection = ['ManyToMany'].includes(rel.type); %>
-      <%= propertyName %>: entity.<%= propertyName %> ?? <% if (isCollection) { %>[]<% } else { %>null<% } %>,
+      <% dateFields.forEach(field => { %>
+      <%= field.fieldName %>: this.convertDateForForm(entity.<%= field.fieldName %>),
       <% }); %>
     } as any);
     form.controls.id.setValue(entity.id);
+  }
+
+  private convertDateForForm(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return value;
+    }
+    if (dayjs.isDayjs(value)) {
+      return value.toDate();
+    }
+    const parsed = new Date(value as string);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 }

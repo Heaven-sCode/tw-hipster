@@ -12,35 +12,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { finalize } from 'rxjs/operators';
 
 import { I<%= entity.name %>, New<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
 import { <%= entity.name %>Service } from '../service/<%= toKebabCase(entity.name) %>.service';
 import { <%= entity.name %>FormGroup, <%= entity.name %>FormService } from '../update/<%= toKebabCase(entity.name) %>-form.service';
 
-<%
-// Helper computation for relationship-related imports and names
-function relationshipPropertyName(rel) {
-  const isCollection = ['OneToMany', 'ManyToMany'].includes(rel.type);
-  if (rel.from.fieldName) {
-    return toCamelCase(rel.from.fieldName);
-  }
-  return isCollection ? toCamelCase(rel.otherEntityNamePlural) : toCamelCase(rel.otherEntityName);
-}
-const relationshipsForControls = relationships.filter(rel => rel.type !== 'OneToMany');
-const relationshipImports = new Map();
-relationshipsForControls.forEach(rel => {
-  if (rel.otherEntityName !== entity.name && !relationshipImports.has(rel.otherEntityName)) {
-    relationshipImports.set(
-      rel.otherEntityName,
-      {
-        modelImport: `import { I${rel.otherEntityName} } from '../../${toKebabCase(rel.otherEntityName)}/${toKebabCase(rel.otherEntityName)}.model';`,
-        serviceImport: `import { ${rel.otherEntityName}Service } from '../../${toKebabCase(rel.otherEntityName)}/service/${toKebabCase(rel.otherEntityName)}.service';`,
-      }
-    );
-  }
-});
-
+<% 
 const enumImports = new Map();
 entity.fields.forEach(field => {
   if (field.fieldTypeIsEnum && !enumImports.has(field.fieldType)) {
@@ -48,8 +27,6 @@ entity.fields.forEach(field => {
   }
 });
 %>
-<%- Array.from(relationshipImports.values()).map(item => item.modelImport).join('\n') %>
-<%- Array.from(relationshipImports.values()).map(item => item.serviceImport).join('\n') %>
 <%- Array.from(enumImports.values()).join('\n') %>
 
 type <%= entity.name %>FormDialogData = {
@@ -77,6 +54,7 @@ type <%= entity.name %>FormDialogData = {
     MatNativeDateModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    MatSnackBarModule,
   ],
   templateUrl: './<%= toKebabCase(entity.name) %>-form.component.html',
 })
@@ -85,6 +63,7 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
   private readonly formService = inject(<%= entity.name %>FormService);
   private readonly dialogRef = inject(MatDialogRef<<%= entity.name %>FormComponent>, { optional: true });
   private readonly dialogData = inject(MAT_DIALOG_DATA, { optional: true }) as <%= entity.name %>FormDialogData | null;
+  private readonly snackBar = inject(MatSnackBar);
 
   @Input() entity: I<%= entity.name %> | null = null;
   @Input() heading?: string;
@@ -101,21 +80,8 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
   readonly <%= toCamelCase(field.fieldType) %>Options = Object.keys(<%= field.fieldType %>);
   <% }}); %>
 
-  <% relationshipsForControls.forEach(rel => { 
-       const propertyName = relationshipPropertyName(rel);
-       const otherEntityCamel = toCamelCase(rel.otherEntityName);
-       const otherEntityPascal = rel.otherEntityName;
-       const optionsProperty = `${otherEntityCamel}Options`;
-  %>
-  <% if (rel.otherEntityName !== entity.name) { %>
-  private readonly <%= otherEntityCamel %>Service = inject(<%= otherEntityPascal %>Service);
-  <% } %>
-  <%= optionsProperty %>: I<%= otherEntityPascal %>[] = [];
-  <% }); %>
-
   ngOnInit(): void {
     this.initializeFormFromInputs();
-    this.loadRelationshipOptions();
     this.isInitialized = true;
   }
 
@@ -145,12 +111,19 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
     request$.pipe(finalize(() => (this.isSaving = false))).subscribe({
       next: response => {
         if (response.body) {
+          this.resetToDefaults();
           this.saved.emit(response.body);
           this.dialogRef?.close(response.body);
         }
       },
       error: () => {
         this.errorMessage = 'Unable to save record. Please try again.';
+        this.snackBar.open('Unable to save record. Please try again.', 'Close', {
+          duration: 3000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom',
+          panelClass: ['error-snackbar'],
+        });
       },
     });
   }
@@ -163,10 +136,6 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
   get isEditMode(): boolean {
     return !!this.form.controls.id.value;
   }
-
-  readonly compareEntityById = (option: { id?: number } | null, value: { id?: number } | null): boolean =>
-    option && value ? option.id === value.id : option === value;
-
   private initializeFormFromInputs(): void {
     if (!this.heading && this.dialogData?.heading) {
       this.heading = this.dialogData.heading;
@@ -180,15 +149,11 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
     }
   }
 
-  private loadRelationshipOptions(): void {
-    <% relationshipsForControls.forEach(rel => { 
-      const otherEntityCamel = toCamelCase(rel.otherEntityName);
-      const optionsProperty = `${otherEntityCamel}Options`;
-    %>
-    this.<%= otherEntityCamel %>Service.query().subscribe({
-      next: response => (this.<%= optionsProperty %> = response.body ?? []),
-      error: () => (this.<%= optionsProperty %> = []),
-    });
-    <% }); %>
+  private resetToDefaults(): void {
+    this.entity = null;
+    const defaults = this.dialogData?.defaults ?? {};
+    this.formService.resetForm(this.form, { id: null, ...defaults } as Partial<New<%= entity.name %>>);
+    this.form.markAsPristine();
+    this.form.markAsUntouched();
   }
 }

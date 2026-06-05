@@ -5,6 +5,10 @@ const auditFieldNames = ['createdBy', 'createdDate', 'lastModifiedBy', 'lastModi
 const toSpacedLabel = (str) => {
   return str.replace(/([A-Z])/g, ' $1').trim().replace(/^./, c => c.toUpperCase());
 };
+const estimateHeaderWidth = (label) => {
+  const normalized = String(label ?? '').trim();
+  return Math.min(Math.max(normalized.length * 11 + 52, 96), 320);
+};
 %>
 <mat-drawer-container class="absolute h-full w-full bg-transparent">
 
@@ -13,7 +17,7 @@ const toSpacedLabel = (str) => {
     <app-<%= toKebabCase(entity.name) %>-filter
       [activeFilters]="activeFilters"
       (applied)="handleFiltersApplied($event)"
-      (closed)="filterDrawer.close()"
+      (closed)="handleFilterDrawerClosed()"
     >
     </app-<%= toKebabCase(entity.name) %>-filter>
   </mat-drawer>
@@ -23,7 +27,7 @@ const toSpacedLabel = (str) => {
     <div class="absolute inset-0 flex min-w-0 flex-col overflow-hidden">
 
       <!-- Header (fixed, does not scroll) -->
-      <div class="bg-default dark:bg-transparent flex flex-0 flex-col p-6 pb-22 xl:flex-row xl:items-center xl:justify-between xl:px-10 xl:pb-28 xl:pt-12">
+      <div class="flex flex-0 flex-col border-b border-slate-200 bg-slate-100 p-6 pb-22 md:flex-row md:items-center md:justify-between md:px-10 md:pb-28 md:pt-12 dark:border-slate-800 dark:bg-slate-900/60">
         <div class="min-w-0 flex-1">
           <h2 class="truncate text-3xl font-extrabold leading-7 tracking-tight sm:leading-10 md:text-4xl">
             <%= entity.name.replace(/([A-Z])/g, ' $1').trim() %> Management
@@ -48,19 +52,16 @@ const toSpacedLabel = (str) => {
 
       <!-- Main -->
       <div
-        class="bg-card -mt-16 flex-auto overflow-y-auto rounded-t-2xl p-6 shadow sm:p-10"
+        class="-mt-16 flex min-h-0 flex-auto flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow dark:border-slate-800 dark:bg-neutral-950"
         cdkScrollable
       >
+        <div class="flex min-h-0 flex-1 flex-col p-6 sm:p-10">
           <!-- Table View -->
           @if (viewMode === 'table') {
-            <div *ngIf="isLoading" class="flex items-center justify-center p-8">
-              <mat-progress-spinner [diameter]="40" [mode]="'indeterminate'"></mat-progress-spinner>
-            </div>
-
-            <div #tableWrapper class="-m-6 overflow-auto flex-auto sm:-m-10 min-h-[520px] pb-[100px]" *ngIf="!isLoading" (scroll)="onTableScroll()" cdkScrollable>
+            <div #tableWrapper class="-m-6 min-h-0 flex-auto overflow-auto pb-[100px] sm:-m-10" (scroll)="onTableScroll()" cdkScrollable>
               <table
                 mat-table
-                [dataSource]="dataSource"
+                [dataSource]="isLoading ? skeletonData : dataSource"
                 matSort
                 (matSortChange)="loadData()"
                 cdkDropList
@@ -72,56 +73,81 @@ const toSpacedLabel = (str) => {
 
               <!-- Dynamically generate columns for entity fields -->
               <ng-container matColumnDef="id">
-                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'id'" tableId="<%= toKebabCase(entity.name) %>">ID</th>
+                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'id'" tableId="<%= toKebabCase(entity.name) %>" style="min-width: <%= estimateHeaderWidth('ID') %>px;">ID</th>
                 <td mat-cell *matCellDef="let element">{{ element.id }}</td>
               </ng-container>
               <ng-container matColumnDef="state">
                 <th mat-header-cell *matHeaderCellDef class="w-28">State</th>
                 <td mat-cell *matCellDef="let element">
-                  <div class="flex items-center gap-1.5">
-                    <button
-                      mat-icon-button
-                      type="button"
-                      class="h-8 w-8"
-                      (click)="togglePin(element)"
-                      [matTooltip]="isPinned(element.id) ? 'Unpin row' : 'Pin row'"
-                    >
-                      <mat-icon svgIcon="pin" [ngClass]="isPinned(element.id) ? 'text-red-500' : 'text-neutral-400'"></mat-icon>
-                    </button>
-                    <button
-                      mat-icon-button
-                      type="button"
-                      class="h-8 w-8"
-                      [matMenuTriggerFor]="flagMenu"
-                      (click)="setFlagMenuRow(element)"
-                      matTooltip="Set color flag"
-                    >
-                      <mat-icon svgIcon="flag" [ngClass]="getFlagClass(element.id)"></mat-icon>
-                    </button>
-                  </div>
+                  <ng-container *ngIf="isLoading; else stateButtons">
+                    <div class="flex items-center gap-1.5">
+                      <div class="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                      <div class="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                    </div>
+                  </ng-container>
+                  <ng-template #stateButtons>
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        mat-icon-button
+                        type="button"
+                        class="h-8 w-8"
+                        (click)="togglePin(element)"
+                        [matTooltip]="isPinned(element.id) ? 'Unpin row' : 'Pin row'"
+                      >
+                        <mat-icon svgIcon="pin" [ngClass]="isPinned(element.id) ? 'text-red-500' : 'text-neutral-400'"></mat-icon>
+                      </button>
+                      <button
+                        mat-icon-button
+                        type="button"
+                        class="h-8 w-8"
+                        [matMenuTriggerFor]="flagMenu"
+                        (click)="setFlagMenuRow(element)"
+                        matTooltip="Set color flag"
+                      >
+                        <mat-icon svgIcon="flag" [ngClass]="getFlagClass(element.id)"></mat-icon>
+                      </button>
+                    </div>
+                  </ng-template>
                 </td>
               </ng-container>
               <% entity.fields.filter(field => !auditFieldNames.includes(field.fieldName)).forEach(field => { %>
               <ng-container matColumnDef="<%= field.fieldName %>">
-                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'<%= field.fieldName %>'" tableId="<%= toKebabCase(entity.name) %>"><%= toSpacedLabel(field.fieldName) %></th>
+                <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'<%= field.fieldName %>'" tableId="<%= toKebabCase(entity.name) %>" style="min-width: <%= estimateHeaderWidth(toSpacedLabel(field.fieldName)) %>px;"><%= toSpacedLabel(field.fieldName) %></th>
                 <% if (['LocalDate', 'Instant', 'ZonedDateTime'].includes(field.fieldType)) { %>
-                <td mat-cell *matCellDef="let element">{{ element.<%= field.fieldName %>?.toDate() | date: 'medium' }}</td>
+                <td mat-cell *matCellDef="let element">
+                  <ng-container *ngIf="isLoading; else <%= field.fieldName %>DateValue">
+                    <div class="h-4 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700"></div>
+                  </ng-container>
+                  <ng-template #<%= field.fieldName %>DateValue>{{ element.<%= field.fieldName %>?.toDate() | date: 'medium' }}</ng-template>
+                </td>
                 <% } else if (field.fieldType === 'Boolean') { %>
                   <td mat-cell *matCellDef="let element">
-                    <ng-container *ngIf="element.<%= field.fieldName %> === true; else notTrue">
-                      <mat-icon svgIcon="circle-check" class="text-emerald-500" matTooltip="True"></mat-icon>
+                    <ng-container *ngIf="isLoading; else <%= field.fieldName %>BooleanValue">
+                      <div class="h-5 w-5 animate-pulse rounded bg-slate-200 dark:bg-slate-700"></div>
                     </ng-container>
-                    <ng-template #notTrue>
-                      <ng-container *ngIf="element.<%= field.fieldName %> === false; else notSet">
-                        <mat-icon svgIcon="circle-x" class="text-rose-500" matTooltip="False"></mat-icon>
+                    <ng-template #<%= field.fieldName %>BooleanValue>
+                      <ng-container *ngIf="element.<%= field.fieldName %> === true; else <%= field.fieldName %>NotTrue">
+                        <mat-icon svgIcon="circle-check" class="text-emerald-500" matTooltip="True"></mat-icon>
                       </ng-container>
-                    </ng-template>
-                    <ng-template #notSet>
-                      <mat-icon svgIcon="circle-minus" class="text-neutral-400" matTooltip="Not Set"></mat-icon>
+                      <ng-template #<%= field.fieldName %>NotTrue>
+                        <ng-container *ngIf="element.<%= field.fieldName %> === false; else <%= field.fieldName %>NotSet">
+                          <mat-icon svgIcon="circle-x" class="text-rose-500" matTooltip="False"></mat-icon>
+                        </ng-container>
+                      </ng-template>
+                      <ng-template #<%= field.fieldName %>NotSet>
+                        <mat-icon svgIcon="circle-minus" class="text-neutral-400" matTooltip="Not Set"></mat-icon>
+                      </ng-template>
                     </ng-template>
                   </td>
                 <% } else { %>
-                <td mat-cell *matCellDef="let element" [innerHTML]="highlightText(element.<%= field.fieldName %>, searchBy === '<%= field.fieldName %>' ? searchTerm : '')"></td>
+                <td mat-cell *matCellDef="let element">
+                  <ng-container *ngIf="isLoading; else <%= field.fieldName %>TextValue">
+                    <div class="h-4 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700"></div>
+                  </ng-container>
+                  <ng-template #<%= field.fieldName %>TextValue>
+                    <span [innerHTML]="highlightText(element.<%= field.fieldName %>, searchBy === '<%= field.fieldName %>' ? searchTerm : '')"></span>
+                  </ng-template>
+                </td>
                 <% } %>
               </ng-container>
               <% }); %>
@@ -129,73 +155,113 @@ const toSpacedLabel = (str) => {
               <!-- Generate columns for "Show Children" buttons -->
               <% collectionRelationships.forEach(rel => { %>
               <ng-container matColumnDef="actions-<%= rel.otherEntityName %>">
-                <th mat-header-cell cdkDrag *matHeaderCellDef [appResizable]="'actions-<%= rel.otherEntityName %>'" tableId="<%= toKebabCase(entity.name) %>"> <%= toSpacedLabel(rel.otherEntityNamePascalCase) %> </th>
+                <th mat-header-cell cdkDrag *matHeaderCellDef [appResizable]="'actions-<%= rel.otherEntityName %>'" tableId="<%= toKebabCase(entity.name) %>" style="min-width: <%= estimateHeaderWidth(toSpacedLabel(rel.otherEntityNamePascalCase)) %>px;"> <%= toSpacedLabel(rel.otherEntityNamePascalCase) %> </th>
                 <td mat-cell *matCellDef="let element">
-                  <button mat-icon-button (click)="show<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Show <%= rel.otherEntityNamePascalCase %>">
-                    <mat-icon svgIcon="file"></mat-icon>
-                  </button>
-                  <button mat-icon-button class="ml-2" (click)="add<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Add <%= rel.otherEntityNamePascalCase %>">
-                    <mat-icon svgIcon="plus"></mat-icon>
-                  </button>
+                  <ng-container *ngIf="isLoading; else relationshipActions">
+                    <div class="flex items-center gap-2">
+                      <div class="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                      <div class="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                    </div>
+                  </ng-container>
+                  <ng-template #relationshipActions>
+                    <button mat-icon-button class="text-sky-600 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-500/10" (click)="show<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Show <%= rel.otherEntityNamePascalCase %>">
+                      <mat-icon svgIcon="file"></mat-icon>
+                    </button>
+                    <button mat-icon-button class="ml-2 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10" (click)="add<%= rel.otherEntityNamePascalCase %>(element)" matTooltip="Add <%= rel.otherEntityNamePascalCase %>">
+                      <mat-icon svgIcon="plus"></mat-icon>
+                    </button>
+                  </ng-template>
                 </td>
               </ng-container>
               <% }); %>
 <!-- Audit Columns -->
 <% if (entity.fields.some(field => field.fieldName === 'createdBy')) { %>
 <ng-container matColumnDef="createdBy">
-  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'createdBy'" tableId="<%= toKebabCase(entity.name) %>">Created By</th>
+  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'createdBy'" tableId="<%= toKebabCase(entity.name) %>" style="min-width: <%= estimateHeaderWidth('Created By') %>px;">Created By</th>
   <td mat-cell *matCellDef="let element">
-    <span class="text-blue-600 dark:text-blue-400 font-medium" [innerHTML]="highlightText(element.createdBy, searchBy === 'createdBy' ? searchTerm : '')"></span>
+    <ng-container *ngIf="isLoading; else createdByValue">
+      <div class="h-4 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700"></div>
+    </ng-container>
+    <ng-template #createdByValue>
+      <span class="text-blue-600 dark:text-blue-400 font-medium" [innerHTML]="highlightText(element.createdBy, searchBy === 'createdBy' ? searchTerm : '')"></span>
+    </ng-template>
   </td>
 </ng-container>
 <% } %>
 
 <% if (entity.fields.some(field => field.fieldName === 'createdDate')) { %>
 <ng-container matColumnDef="createdDate">
-  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'createdDate'" tableId="<%= toKebabCase(entity.name) %>">Created Date</th>
+  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'createdDate'" tableId="<%= toKebabCase(entity.name) %>" style="min-width: <%= estimateHeaderWidth('Created Date') %>px;">Created Date</th>
   <td mat-cell *matCellDef="let element">
-    <span class="text-slate-500 dark:text-slate-400">{{ element.createdDate?.toDate() | date: 'medium' }}</span>
+    <ng-container *ngIf="isLoading; else createdDateValue">
+      <div class="h-4 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700"></div>
+    </ng-container>
+    <ng-template #createdDateValue>
+      <span class="text-slate-500 dark:text-slate-400">{{ element.createdDate?.toDate() | date: 'medium' }}</span>
+    </ng-template>
   </td>
 </ng-container>
 <% } %>
 
 <% if (entity.fields.some(field => field.fieldName === 'lastModifiedBy')) { %>
 <ng-container matColumnDef="lastModifiedBy">
-  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'lastModifiedBy'" tableId="<%= toKebabCase(entity.name) %>">Last Modified By</th>
+  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'lastModifiedBy'" tableId="<%= toKebabCase(entity.name) %>" style="min-width: <%= estimateHeaderWidth('Last Modified By') %>px;">Last Modified By</th>
   <td mat-cell *matCellDef="let element">
-    <span class="text-indigo-600 dark:text-indigo-400 font-medium" [innerHTML]="highlightText(element.lastModifiedBy, searchBy === 'lastModifiedBy' ? searchTerm : '')"></span>
+    <ng-container *ngIf="isLoading; else lastModifiedByValue">
+      <div class="h-4 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700"></div>
+    </ng-container>
+    <ng-template #lastModifiedByValue>
+      <span class="text-indigo-600 dark:text-indigo-400 font-medium" [innerHTML]="highlightText(element.lastModifiedBy, searchBy === 'lastModifiedBy' ? searchTerm : '')"></span>
+    </ng-template>
   </td>
 </ng-container>
 <% } %>
 
 <% if (entity.fields.some(field => field.fieldName === 'lastModifiedDate')) { %>
 <ng-container matColumnDef="lastModifiedDate">
-  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'lastModifiedDate'" tableId="<%= toKebabCase(entity.name) %>">Last Modified Date</th>
+  <th mat-header-cell cdkDrag *matHeaderCellDef mat-sort-header [appResizable]="'lastModifiedDate'" tableId="<%= toKebabCase(entity.name) %>" style="min-width: <%= estimateHeaderWidth('Last Modified Date') %>px;">Last Modified Date</th>
   <td mat-cell *matCellDef="let element">
-    <span class="text-slate-500 dark:text-slate-400">{{ element.lastModifiedDate?.toDate() | date: 'medium' }}</span>
+    <ng-container *ngIf="isLoading; else lastModifiedDateValue">
+      <div class="h-4 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700"></div>
+    </ng-container>
+    <ng-template #lastModifiedDateValue>
+      <span class="text-slate-500 dark:text-slate-400">{{ element.lastModifiedDate?.toDate() | date: 'medium' }}</span>
+    </ng-template>
   </td>
 </ng-container>
 <% } %>
               <!-- General Actions Column (Edit/Delete) -->
                 <ng-container matColumnDef="actions" stickyEnd>
-                  <th mat-header-cell *matHeaderCellDef class="!bg-white dark:!bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 font-semibold text-primary whitespace-nowrap z-100" [class.shadow-left]="isActionsShadowVisible">Actions</th>
+                  <th mat-header-cell *matHeaderCellDef class="!bg-white dark:!bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 font-semibold text-primary whitespace-nowrap z-100" [class.shadow-left]="isActionsShadowVisible" style="min-width: <%= estimateHeaderWidth('Actions') %>px;">Actions</th>
                   <td mat-cell *matCellDef="let element" class="!bg-white dark:!bg-neutral-900 group-hover:!bg-neutral-50 dark:group-hover:!bg-neutral-800/30 border-l border-neutral-200 dark:border-neutral-800 whitespace-nowrap" [ngClass]="getStickyClass(element)" [class.shadow-left]="isActionsShadowVisible">
-                    <div class="flex items-center justify-center gap-0.5">
-                      <button mat-icon-button class="h-8 w-8 flex items-center justify-center" (click)="viewDetails(element.id)" matTooltip="View Details">
-                        <mat-icon svgIcon="eye"></mat-icon>
-                      </button>
-                      <button mat-icon-button class="h-8 w-8 flex items-center justify-center" (click)="openFormDrawer(element.id)" matTooltip="Edit <%= entity.name %>">
-                        <mat-icon svgIcon="square-pen"></mat-icon>
-                      </button>
-                      <button mat-icon-button class="h-8 w-8 flex items-center justify-center" (click)="delete(element.id)" matTooltip="Delete <%= entity.name %>">
-                        <mat-icon class="text-warn" svgIcon="trash"></mat-icon>
-                      </button>
-                      <% if (entity.fields.some(f => f.fieldName === 'isActive')) { %>
-                      <button mat-icon-button class="h-8 w-8 flex items-center justify-center" (click)="toggleActive(element)" matTooltip="{{element.isActive ? 'Deactivate' : 'Activate'}}">
-                        <mat-icon svgIcon="{{element.isActive ? 'toggle-right' : 'toggle-left'}}" class="{{element.isActive ? 'text-green-500' : 'text-gray-500'}}"></mat-icon>
-                      </button>
-                      <% } %>
-                    </div>
+                    <ng-container *ngIf="isLoading; else actionButtons">
+                      <div class="flex items-center justify-center gap-2">
+                        <div class="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                        <div class="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                        <div class="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                        <% if (entity.fields.some(f => f.fieldName === 'isActive')) { %>
+                        <div class="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                        <% } %>
+                      </div>
+                    </ng-container>
+                    <ng-template #actionButtons>
+                      <div class="flex items-center justify-center gap-0.5">
+                        <button mat-icon-button class="h-8 w-8 flex items-center justify-center text-sky-600 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-500/10" (click)="viewDetails(element.id)" matTooltip="View Details">
+                          <mat-icon svgIcon="eye"></mat-icon>
+                        </button>
+                        <button mat-icon-button class="h-8 w-8 flex items-center justify-center text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10" (click)="openFormDrawer(element.id)" matTooltip="Edit <%= entity.name %>">
+                          <mat-icon svgIcon="square-pen"></mat-icon>
+                        </button>
+                        <button mat-icon-button class="h-8 w-8 flex items-center justify-center text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10" (click)="delete(element.id)" matTooltip="Delete <%= entity.name %>">
+                          <mat-icon svgIcon="trash"></mat-icon>
+                        </button>
+                        <% if (entity.fields.some(f => f.fieldName === 'isActive')) { %>
+                        <button mat-icon-button class="h-8 w-8 flex items-center justify-center" [ngClass]="element.isActive ? 'text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-500/10' : 'text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10'" (click)="toggleActive(element)" matTooltip="{{element.isActive ? 'Deactivate' : 'Activate'}}">
+                          <mat-icon svgIcon="{{element.isActive ? 'toggle-right' : 'toggle-left'}}"></mat-icon>
+                        </button>
+                        <% } %>
+                      </div>
+                    </ng-template>
                   </td>
                 </ng-container>
 
@@ -214,33 +280,39 @@ const toSpacedLabel = (str) => {
             <div *ngIf="isLoading" class="flex items-center justify-center p-8">
               <mat-progress-spinner [diameter]="40" [mode]="'indeterminate'"></mat-progress-spinner>
             </div>
-            <div *ngIf="!isLoading" class="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              <app-<%= toKebabCase(entity.name) %>-card *ngFor="let element of dataSource.data" [item]="element" [searchTerm]="searchTerm" [searchBy]="searchBy" [pinned]="isPinned(element.id)" [flagClass]="getFlagClass(element.id)" class="block"></app-<%= toKebabCase(entity.name) %>-card>
-            </div>
-            <div *ngIf="!isLoading && !dataSource.data.length" class="p-8 text-center text-neutral-500">
-              No data found.
+            <div *ngIf="!isLoading" class="-m-6 min-h-0 flex-auto overflow-y-auto sm:-m-10">
+              <div class="grid grid-cols-1 gap-6 p-6 sm:grid-cols-2 sm:p-10 md:grid-cols-3 lg:grid-cols-4">
+                <app-<%= toKebabCase(entity.name) %>-card *ngFor="let element of dataSource.data" [item]="element" [searchTerm]="searchTerm" [searchBy]="searchBy" [pinned]="isPinned(element.id)" [flagClass]="getFlagClass(element.id)" class="block"></app-<%= toKebabCase(entity.name) %>-card>
+              </div>
+              <div *ngIf="!dataSource.data.length" class="p-8 text-center text-neutral-500">
+                No data found.
+              </div>
             </div>
           }
+        </div>
+
+        <!-- Paginator (sticky at bottom of the scroll panel) -->
+        <mat-paginator
+          class="sticky bottom-0 z-10 flex-0 shrink-0 border-t border-neutral-200 bg-card [&_.mat-mdc-paginator-container]:justify-start"
+          [length]="totalItems"
+          [pageSize]="itemsPerPage"
+          [pageSizeOptions]="[10, 25, 50, 100]"
+          (page)="loadData()"
+        ></mat-paginator>
       </div>
 
-      <!-- Paginator (locked at bottom, never scrolls) -->
-      <mat-paginator
-        class="flex-0 shrink-0 border-t border-neutral-200 bg-card [&_.mat-mdc-paginator-container]:justify-start"
-        [length]="totalItems"
-        [pageSize]="itemsPerPage"
-        [pageSizeOptions]="[10, 25, 50, 100]"
-        (page)="loadData()"
-      ></mat-paginator>
-
       <button
-        mat-fab
+        mat-flat-button
         color="primary"
         type="button"
-        class="fixed bottom-6 right-6 z-20 shadow-lg"
+        class="fixed bottom-6 right-6 z-40 h-12 rounded-full px-4 shadow-lg"
         [matMenuTriggerFor]="exportMenu"
         [disabled]="isLoading || isExporting"
         matTooltip="{{ isExporting ? 'Exporting...' : 'Export options' }}">
-        <mat-icon svgIcon="download"></mat-icon>
+        <span class="flex items-center justify-center gap-2">
+          <mat-icon svgIcon="download" class="m-0"></mat-icon>
+         
+        </span>
       </button>
     </div>
   </mat-drawer-content>
@@ -283,16 +355,13 @@ const toSpacedLabel = (str) => {
   </mat-menu>
 
   <mat-menu #flagMenu="matMenu">
-    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full xl:w-64">
-      <mat-icon matPrefix svgIcon="search" class="text-neutral-500 mr-2"></mat-icon>
-      <input matInput placeholder="Search…" [ngModel]="searchTerm" (ngModelChange)="onSearchTermChange($event)" />
-      <button mat-icon-button matSuffix type="button" (click)="onSearchTermChange('')" *ngIf="searchTerm" class="h-8 w-8 min-w-0 p-0 flex items-center justify-center">
-        <mat-icon svgIcon="x" class="text-neutral-500"></mat-icon>
-      </button>
-    </mat-form-field>
     <button mat-menu-item type="button" *ngFor="let option of rowFlagOptions" (click)="setFlagColor(option.key)">
       <mat-icon svgIcon="flag" class="mr-3" [ngClass]="option.iconClass"></mat-icon>
       <span>{{ option.label }}</span>
+    </button>
+    <button mat-menu-item type="button" (click)="setFlagColor(null)">
+      <mat-icon svgIcon="x" class="mr-3 text-neutral-500"></mat-icon>
+      <span>Clear Flag</span>
     </button>
   </mat-menu>
 
