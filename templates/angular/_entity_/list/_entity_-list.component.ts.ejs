@@ -500,6 +500,12 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
   }
 
   handleFormSaved(): void {
+    this.snackBar.open('<%= entity.name %> saved successfully', 'Close', {
+      duration: 2000,
+      horizontalPosition: 'center',
+      verticalPosition: 'bottom',
+      panelClass: ['success-snackbar'],
+    });
     this.closeFormDrawer();
     this.refreshTrigger.next();
     this.loadData();
@@ -516,6 +522,12 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
         return;
       }
       this.<%= toCamelCase(entity.name) %>Service.delete(id).subscribe(() => {
+        this.snackBar.open('<%= entity.name %> deleted successfully', 'Close', {
+          duration: 2000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom',
+          panelClass: ['success-snackbar'],
+        });
         this.refreshTrigger.next();
         this.loadData();
       });
@@ -809,6 +821,12 @@ export class <%= entity.name %>ListComponent implements AfterViewInit, OnInit {
       if (confirmed) {
         const updated = { ...element, isActive: newActiveState };
         this.<%= toCamelCase(entity.name) %>Service.update(updated).subscribe(() => {
+          this.snackBar.open('<%= entity.name %> ' + (newActiveState ? 'activated' : 'deactivated') + ' successfully', 'Close', {
+            duration: 2000,
+            horizontalPosition: 'center',
+            verticalPosition: 'bottom',
+            panelClass: ['success-snackbar'],
+          });
           this.refreshTrigger.next();
           this.loadData();
         });

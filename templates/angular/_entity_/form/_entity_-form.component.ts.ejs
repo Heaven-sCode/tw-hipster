@@ -12,6 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { finalize } from 'rxjs/operators';
 
 import { I<%= entity.name %>, New<%= entity.name %> } from '../<%= toKebabCase(entity.name) %>.model';
@@ -53,6 +54,7 @@ type <%= entity.name %>FormDialogData = {
     MatNativeDateModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    MatSnackBarModule,
   ],
   templateUrl: './<%= toKebabCase(entity.name) %>-form.component.html',
 })
@@ -61,6 +63,7 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
   private readonly formService = inject(<%= entity.name %>FormService);
   private readonly dialogRef = inject(MatDialogRef<<%= entity.name %>FormComponent>, { optional: true });
   private readonly dialogData = inject(MAT_DIALOG_DATA, { optional: true }) as <%= entity.name %>FormDialogData | null;
+  private readonly snackBar = inject(MatSnackBar);
 
   @Input() entity: I<%= entity.name %> | null = null;
   @Input() heading?: string;
@@ -115,6 +118,12 @@ export class <%= entity.name %>FormComponent implements OnInit, OnChanges {
       },
       error: () => {
         this.errorMessage = 'Unable to save record. Please try again.';
+        this.snackBar.open('Unable to save record. Please try again.', 'Close', {
+          duration: 3000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom',
+          panelClass: ['error-snackbar'],
+        });
       },
     });
   }

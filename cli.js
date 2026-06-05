@@ -387,6 +387,7 @@ async function generateEntityFiles(config, entity, allRelationships) {
         // Shared directive used by generated list templates
         { template: 'resizable.directive.ts', subfolder: 'shared', outputPattern: 'resizable.directive.ts' },
         { template: 'confirmation-dialog.component.ts', subfolder: 'shared', outputPattern: 'confirmation-dialog.component.ts' },
+        { template: 'snackbar-styles.css', subfolder: 'shared', outputPattern: 'snackbar-styles.css' },
         { template: '_entity_-list.component.ts.ejs', subfolder: 'list',   outputPattern: '<%= entityName %>-list.component.ts' },
         { template: '_entity_-list.component.html.ejs', subfolder: 'list',   outputPattern: '<%= entityName %>-list.component.html' },
         { template: '_entity_-list.component.scss.ejs', subfolder: 'list',   outputPattern: '<%= entityName %>-list.component.scss' },
